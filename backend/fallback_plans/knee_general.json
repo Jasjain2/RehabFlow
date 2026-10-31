@@ -1,0 +1,25 @@
+{
+  "exercises": [
+    {
+      "name": "squat",
+      "sets": 2,
+      "reps_per_set": 6,
+      "rest_seconds": 120,
+      "coaching_cues": [
+        "Stand with feet shoulder-width apart, toes slightly turned out",
+        "Push your hips back as if sitting into a chair",
+        "Keep your knees tracking over your toes, not caving inward",
+        "Only go as low as you can without knee pain",
+        "Drive up through your heels"
+      ],
+      "safety_warnings": [
+        "Stop immediately if you feel sharp pain in the knee",
+        "Do not let your knees collapse inward",
+        "Hold onto a chair or counter for balance if needed"
+      ]
+    }
+  ],
+  "warmup": "March in place for 2 minutes, then do 10 slow heel raises and 10 gentle leg swings per side.",
+  "cooldown": "Walk slowly for 1 minute, then hold a gentle standing quadriceps stretch for 30 seconds per leg.",
+  "overall_safety": "This is a low-volume knee plan. Mild muscle effort is expected; joint pain is not. Stop and consult your physical therapist if pain increases during or after the session."
+}

@@ -1,0 +1,25 @@
+{
+  "exercises": [
+    {
+      "name": "squat",
+      "sets": 3,
+      "reps_per_set": 10,
+      "rest_seconds": 90,
+      "coaching_cues": [
+        "Stand with feet shoulder-width apart",
+        "Keep your chest up and your back neutral",
+        "Lower until your thighs are close to parallel with the floor",
+        "Keep your knees tracking over your toes",
+        "Drive up through your heels"
+      ],
+      "safety_warnings": [
+        "Stop if you feel sharp pain in the hip, knee, or ankle",
+        "Do not round your lower back at the bottom",
+        "Hold onto a chair or counter for balance if needed"
+      ]
+    }
+  ],
+  "warmup": "March in place for 2 minutes, then do 10 bodyweight good mornings and 10 leg swings per side.",
+  "cooldown": "Walk slowly for 1 minute, then hold quadriceps and hamstring stretches for 30 seconds per leg.",
+  "overall_safety": "This is a moderate-volume lower body plan. Keep every rep controlled. Stop and consult your physical therapist if pain increases during or after the session."
+}

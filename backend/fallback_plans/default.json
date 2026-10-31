@@ -1,0 +1,38 @@
+{
+  "exercises": [
+    {
+      "name": "squat",
+      "sets": 2,
+      "reps_per_set": 8,
+      "rest_seconds": 90,
+      "coaching_cues": [
+        "Stand with feet shoulder-width apart",
+        "Push your hips back as if sitting into a chair",
+        "Keep your knees tracking over your toes",
+        "Drive up through your heels"
+      ],
+      "safety_warnings": [
+        "Stop if you feel sharp pain in any joint",
+        "Hold onto a chair or counter for balance if needed"
+      ]
+    },
+    {
+      "name": "push_up",
+      "sets": 2,
+      "reps_per_set": 5,
+      "rest_seconds": 90,
+      "coaching_cues": [
+        "Place hands slightly wider than shoulder-width",
+        "Keep a straight line from head to heels",
+        "Lower slowly and press back up with control"
+      ],
+      "safety_warnings": [
+        "Stop if you feel sharp pain in the shoulder, elbow, or wrist",
+        "Drop to your knees if you cannot keep your body straight"
+      ]
+    }
+  ],
+  "warmup": "March in place for 2 minutes, then do 10 arm circles in each direction and 10 leg swings per side.",
+  "cooldown": "Walk slowly for 1 minute, then hold a quadriceps stretch and a chest stretch for 30 seconds each.",
+  "overall_safety": "This is a light full-body plan. Keep every rep slow and controlled. Stop and consult your physical therapist if pain increases during or after the session."
+}

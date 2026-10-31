@@ -1,0 +1,24 @@
+{
+  "exercises": [
+    {
+      "name": "push_up",
+      "sets": 2,
+      "reps_per_set": 5,
+      "rest_seconds": 120,
+      "coaching_cues": [
+        "Place hands slightly wider than shoulder-width",
+        "Keep elbows at about 45 degrees from your body, not flared out",
+        "Keep a straight line from head to heels",
+        "Lower slowly and only as far as is pain-free"
+      ],
+      "safety_warnings": [
+        "Stop immediately if you feel pinching or sharp pain in the shoulder",
+        "Do not let your shoulders shrug up toward your ears",
+        "Drop to your knees if you cannot keep your body straight"
+      ]
+    }
+  ],
+  "warmup": "Do 10 slow arm circles forward and backward, then 10 shoulder blade squeezes.",
+  "cooldown": "Hold a gentle cross-body shoulder stretch for 30 seconds per arm, then a doorway chest stretch for 30 seconds.",
+  "overall_safety": "This is a low-volume shoulder plan. Keep every rep slow and controlled. Stop and consult your physical therapist if shoulder pain increases during or after the session."
+}

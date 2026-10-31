@@ -1,0 +1,24 @@
+{
+  "exercises": [
+    {
+      "name": "push_up",
+      "sets": 3,
+      "reps_per_set": 8,
+      "rest_seconds": 90,
+      "coaching_cues": [
+        "Place hands slightly wider than shoulder-width",
+        "Brace your core and keep your hips level",
+        "Lower until your elbows reach about 90 degrees",
+        "Press back up to straight arms without locking out hard"
+      ],
+      "safety_warnings": [
+        "Stop if you feel sharp pain in the shoulder, elbow, or wrist",
+        "Do not let your hips sag toward the floor",
+        "Drop to your knees if you cannot keep your body straight"
+      ]
+    }
+  ],
+  "warmup": "Do 10 arm circles in each direction, 10 shoulder blade squeezes, and 10 wall push-ups.",
+  "cooldown": "Hold a doorway chest stretch and a triceps stretch for 30 seconds each.",
+  "overall_safety": "This is a moderate-volume upper body plan. Keep every rep controlled. Stop and consult your physical therapist if pain increases during or after the session."
+}

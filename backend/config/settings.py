@@ -2,9 +2,23 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BACKEND_DIR.parent / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{(BACKEND_DIR / 'rehabflow.db').as_posix()}")
+
+# LLM plan generation
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = "llama-3.3-70b-versatile"
+# Low for consistent plans, but not 0 so similar profiles don't get identical plans
+GROQ_TEMPERATURE = 0.3
+GROQ_MAX_TOKENS = 2048
+GROQ_TIMEOUT_SECONDS = 30
+GROQ_MAX_RETRIES = 3
+# Wait 1s, then 2s, between attempts
+GROQ_BACKOFF_BASE_SECONDS = 1.0
 
 # Form scoring
 POINTS_LOST_PER_DEGREE = 2.0
