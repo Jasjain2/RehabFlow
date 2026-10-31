@@ -52,7 +52,19 @@ python scripts/process_data.py          # writes processed/
 |---|---|---|
 | `squat.csv` | 18,302 | ids, squat type, form label, phase label, knee angle, features |
 | `phase_training.csv` | 18,302 | ids, `phase_label`, features |
-| `form_quality_training.csv` | 12,409 | ids, `form_label`, features; `standing` frames removed, since a standing pose looks the same whatever the squat type |
+| `form_quality_rep_training.csv` | 226 | one row per rep: ids, `form_label`, `knee_min`, `hip_min`, `trunk_max`, `knee_rom` |
+
+Form quality is classified per rep, not per frame. A frame-level classifier on the
+full feature vector scored F1 0.17 under subject-grouped CV, which is chance level:
+any single frame, standing for example, looks the same whatever the squat type.
+The four rep summaries (from `tracking/features.py:rep_summary_features`) are where
+the classes actually differ:
+
+| Squat type | knee_min | hip_min | trunk_max | knee_rom |
+|---|---|---|---|---|
+| standard | 53.1° | 52.6° | 16.9° | 123.7° |
+| shallow | 89.4° | 84.0° | 18.3° | 86.8° |
+| good_morning | 127.0° | 91.2° | 35.1° | 47.3° |
 
 ID columns: `exercise_label`, `subject_id`, `recording_id`, `frame`, `squat_type`.
 

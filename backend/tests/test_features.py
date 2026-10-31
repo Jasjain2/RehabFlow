@@ -1,8 +1,10 @@
+import math
+
 import pytest
 
 from scripts.process_data import derive_phase_labels
 from tracking.analyzer import Landmark
-from tracking.features import FEATURE_NAMES, extract_features
+from tracking.features import FEATURE_NAMES, extract_features, rep_summary_features
 from tests.test_scoring import _standing_pose
 
 
@@ -15,6 +17,16 @@ def test_features_invariant_to_position_and_distance():
     # Same pose, shifted in the frame and half the size (user farther from the camera)
     moved = [Landmark(0.2 + 0.5 * p.x, 0.1 + 0.5 * p.y, p.visibility) for p in pose]
     assert extract_features(moved) == pytest.approx(extract_features(pose))
+
+
+def test_rep_summary_features_ignore_nan():
+    frames = [
+        {"knee_flexion": 175, "hip_flexion": 170, "trunk_lean": 5},
+        {"knee_flexion": 85, "hip_flexion": math.nan, "trunk_lean": 25},
+        {"knee_flexion": 170, "hip_flexion": 80, "trunk_lean": 10},
+    ]
+    assert rep_summary_features(frames) == [85, 80, 25, 90]
+    assert all(math.isnan(v) for v in rep_summary_features([{}]))
 
 
 def test_phase_labels_follow_rep_trajectory():

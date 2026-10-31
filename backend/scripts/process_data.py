@@ -3,7 +3,7 @@
 Outputs (data/processed/):
   squat.csv                  every frame: ids, labels, knee angle, feature vector
   phase_training.csv         phase detector training set
-  form_quality_training.csv  form quality training set (frames in motion only)
+  form_quality_rep_training.csv  form quality training set, one row per rep
 
 Run scripts/download_squat_data.py first.
 Usage: python scripts/process_data.py
@@ -18,7 +18,12 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from config.exercises import EXERCISES  # noqa: E402
 from tracking.analyzer import Landmark, compute_angles  # noqa: E402
-from tracking.features import FEATURE_NAMES, extract_features  # noqa: E402
+from tracking.features import (  # noqa: E402
+    FEATURE_NAMES,
+    REP_FEATURE_NAMES,
+    extract_features,
+    rep_summary_features,
+)
 
 RAW_DIR = BACKEND_DIR / "data" / "raw" / "squat"
 OUT_DIR = BACKEND_DIR / "data" / "processed"
@@ -56,13 +61,14 @@ def derive_phase_labels(knee_angles: list[float]) -> list[str]:
     return labels
 
 
-def process_recording(path: Path, squat_type: str, form_label: str) -> pd.DataFrame:
+def process_recording(path: Path, squat_type: str, form_label: str) -> tuple[pd.DataFrame, dict]:
     raw = pd.read_csv(path)
     landmark_rows = [
         [Landmark(r[f"x_{i}"], r[f"y_{i}"], r[f"v_{i}"]) for i in range(33)]
         for r in raw.to_dict("records")
     ]
-    knee = [compute_angles(lm)["knee_flexion"] for lm in landmark_rows]
+    angles = [compute_angles(lm) for lm in landmark_rows]
+    knee = [a["knee_flexion"] for a in angles]
     features = pd.DataFrame([extract_features(lm) for lm in landmark_rows], columns=FEATURE_NAMES)
 
     meta = pd.DataFrame({
@@ -75,16 +81,23 @@ def process_recording(path: Path, squat_type: str, form_label: str) -> pd.DataFr
         "phase_label": derive_phase_labels(knee),
         "knee_angle": knee,
     })
-    return pd.concat([meta, features], axis=1)
+    frames = pd.concat([meta, features], axis=1)
+    rep = dict(zip(REP_FEATURE_NAMES, rep_summary_features(angles)))
+    rep.update(exercise_label="squat", subject_id=path.stem.split("_")[0], recording_id=path.stem,
+               squat_type=squat_type, form_label=form_label, frames=len(raw))
+    return frames, rep
 
 
 def main() -> None:
-    frames = []
+    frames, reps = [], []
     for folder, (squat_type, form_label) in CLASSES.items():
         paths = sorted((RAW_DIR / folder).glob("*.csv"))
         if not paths:
             sys.exit(f"No CSVs in {RAW_DIR / folder}. Run scripts/download_squat_data.py first.")
-        frames += [process_recording(p, squat_type, form_label) for p in paths]
+        for path in paths:
+            recording_frames, rep = process_recording(path, squat_type, form_label)
+            frames.append(recording_frames)
+            reps.append(rep)
     data = pd.concat(frames, ignore_index=True)
 
     total = len(data)
@@ -100,9 +113,10 @@ def main() -> None:
     phase = data[[*ID_COLUMNS, "phase_label", *FEATURE_NAMES]]
     phase.to_csv(OUT_DIR / "phase_training.csv", index=False)
 
-    # Standing frames look the same in every squat type, so they carry no form signal
-    form = data.loc[data["phase_label"] != "standing", [*ID_COLUMNS, "form_label", *FEATURE_NAMES]]
-    form.to_csv(OUT_DIR / "form_quality_training.csv", index=False)
+    # Form is judged per rep: a single frame (e.g. standing) can't show a shallow squat
+    rep_columns = ["exercise_label", "subject_id", "recording_id", "squat_type", "frames", "form_label"]
+    form = pd.DataFrame(reps)[[*rep_columns, *REP_FEATURE_NAMES]].dropna(subset=REP_FEATURE_NAMES)
+    form.to_csv(OUT_DIR / "form_quality_rep_training.csv", index=False)
 
     print(f"Frames: {total} read, {dropped_nan} dropped (NaN features), {dropped_dupes} dropped (duplicates)")
     print(f"Recordings: {data['recording_id'].nunique()}  Subjects: {data['subject_id'].nunique()}")
@@ -112,8 +126,10 @@ def main() -> None:
     print(phase["phase_label"].value_counts().to_string())
     print("\nPhase labels by squat type:")
     print(pd.crosstab(data["squat_type"], data["phase_label"]).to_string())
-    print(f"\nform_quality_training.csv: {len(form)} frames (standing excluded)")
+    print(f"\nform_quality_rep_training.csv: {len(form)} reps")
     print(form["form_label"].value_counts().to_string())
+    print("\nRep features by squat type (mean):")
+    print(form.groupby("squat_type")[REP_FEATURE_NAMES].mean().round(1).to_string())
 
 
 if __name__ == "__main__":

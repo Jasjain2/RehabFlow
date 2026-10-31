@@ -21,6 +21,23 @@ FEATURE_NAMES = (
 )
 
 
+REP_FEATURE_NAMES = ["knee_min", "hip_min", "trunk_max", "knee_rom"]
+
+
+def rep_summary_features(frame_angles: Sequence[dict[str, float]]) -> list[float]:
+    """Per-rep features for the form quality classifier, in REP_FEATURE_NAMES order.
+
+    `frame_angles` are compute_angles() outputs for every frame of one rep. NaN
+    angles (occluded joints) are ignored.
+    """
+    def valid(name: str) -> list[float]:
+        values = [a[name] for a in frame_angles if not math.isnan(a.get(name, math.nan))]
+        return values or [math.nan]
+
+    knee = valid("knee_flexion")
+    return [min(knee), min(valid("hip_flexion")), max(valid("trunk_lean")), max(knee) - min(knee)]
+
+
 def normalize_landmarks(landmarks: Sequence[Landmark]) -> list[tuple[float, float]]:
     """Center on the hip midpoint and scale by torso length.
 
