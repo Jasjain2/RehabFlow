@@ -1,17 +1,36 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import InjuryForm from '@/components/InjuryForm';
-import { createSession, generatePlan, saveProfile } from '@/lib/api';
-import { errorMessage } from '@/lib/format';
+import { createSession, createSessionFromSuggested, generatePlan, getSuggestedPlan, saveProfile } from '@/lib/api';
+import { EXERCISE_LABELS, errorMessage } from '@/lib/format';
 import { getUserId, setCurrentSessionId } from '@/lib/storage';
-import type { UserProfile } from '@/lib/types';
+import type { SuggestedPlan, UserProfile } from '@/lib/types';
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggested, setSuggested] = useState<SuggestedPlan | null>(null);
+
+  useEffect(() => {
+    // A missing backend shouldn't block the form, so ignore failures here
+    getSuggestedPlan(getUserId()).then(setSuggested, () => setSuggested(null));
+  }, []);
+
+  async function applySuggestedPlan() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { session_id } = await createSessionFromSuggested(getUserId());
+      setCurrentSessionId(session_id);
+      router.push('/plan');
+    } catch (err) {
+      setError(`Could not load your adjusted plan: ${errorMessage(err)}`);
+      setSubmitting(false);
+    }
+  }
 
   async function handleSubmit(profile: UserProfile) {
     setSubmitting(true);
@@ -35,6 +54,24 @@ export default function OnboardingPage() {
         We&apos;ll build a personalized exercise plan, then track your form through your webcam as you
         exercise.
       </p>
+      {suggested && (
+        <section className="mt-6 rounded-lg border border-teal-200 bg-teal-50 p-5">
+          <h2 className="font-semibold text-teal-900">Use your adjusted plan from last session?</h2>
+          <p className="mt-1 text-sm text-teal-900">
+            {suggested.plan.exercises
+              .map((e) => `${EXERCISE_LABELS[e.name]} ${e.sets} × ${e.reps_per_set}`)
+              .join(' · ')}
+          </p>
+          <button
+            onClick={applySuggestedPlan}
+            disabled={submitting}
+            className="mt-3 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:bg-slate-300"
+          >
+            Use adjusted plan
+          </button>
+          <p className="mt-3 text-xs text-teal-800">Or fill in the form below for a new plan.</p>
+        </section>
+      )}
       <div className="mt-6">
         <InjuryForm onSubmit={handleSubmit} submitting={submitting} />
       </div>

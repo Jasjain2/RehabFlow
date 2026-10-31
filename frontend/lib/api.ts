@@ -1,4 +1,4 @@
-import type { HistoryEntry, RehabPlan, SessionReport, UserProfile } from './types';
+import type { HistoryEntry, RehabPlan, SessionReport, SuggestedPlan, UserProfile } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -37,6 +37,21 @@ export function saveProfile(sessionId: string, profile: UserProfile): Promise<vo
 
 export function generatePlan(sessionId: string): Promise<RehabPlan> {
   return post('/api/plan/generate', { session_id: sessionId });
+}
+
+/** The adjusted plan from the user's last session, or null if there isn't one */
+export async function getSuggestedPlan(userId: string): Promise<SuggestedPlan | null> {
+  try {
+    return await request<SuggestedPlan>(`/api/plan/suggested/${userId}`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/** New session reusing the last session's profile and its suggested plan */
+export function createSessionFromSuggested(userId: string): Promise<{ session_id: string }> {
+  return post('/api/session/from-suggested', { user_id: userId });
 }
 
 export function getPlan(sessionId: string): Promise<RehabPlan> {

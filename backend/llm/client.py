@@ -57,12 +57,13 @@ async def call_groq(
     prompt: str,
     parse: Callable[[dict], T],
     *,
+    purpose: str = "llm",
     http_client: httpx.AsyncClient | None = None,
 ) -> T:
     """Send `prompt` in JSON mode and return `parse(response_json)`.
 
     Retries up to GROQ_MAX_RETRIES times, including when `parse` raises a validation
-    error. Raises LLMError when no attempt succeeds.
+    error. Raises LLMError when no attempt succeeds. `purpose` labels the call in logs.
     """
     if not settings.GROQ_API_KEY:
         raise LLMError("GROQ_API_KEY is not set")
@@ -77,16 +78,17 @@ async def call_groq(
             except RETRYABLE_ERRORS as e:
                 last_error = e
                 latency_ms = (time.perf_counter() - start) * 1000
-                log.warning("Groq attempt %d/%d failed after %.0fms: %s",
-                            attempt, settings.GROQ_MAX_RETRIES, latency_ms, e)
+                log.warning("Groq %s attempt %d/%d failed after %.0fms: %s",
+                            purpose, attempt, settings.GROQ_MAX_RETRIES, latency_ms, e)
                 if attempt < settings.GROQ_MAX_RETRIES:
                     await asyncio.sleep(settings.GROQ_BACKOFF_BASE_SECONDS * 2 ** (attempt - 1))
                 continue
 
             latency_ms = (time.perf_counter() - start) * 1000
-            log.info("Groq call succeeded on attempt %d in %.0fms", attempt, latency_ms)
+            log.info("Groq %s call succeeded on attempt %d in %.0fms", purpose, attempt, latency_ms)
             return result
 
+        log.error("Groq %s call failed after %d attempts", purpose, settings.GROQ_MAX_RETRIES)
         raise LLMError(f"All {settings.GROQ_MAX_RETRIES} attempts failed: {last_error}") from last_error
     finally:
         if http_client is None:

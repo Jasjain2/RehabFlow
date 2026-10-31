@@ -42,17 +42,26 @@ class RehabPlan(BaseModel):
 
 
 SessionStatus = Literal["exercising", "resting", "complete"]
+# Rep-level verdict shown to the user, combining the ML classifier with the rule score
+PostureCheck = Literal["good", "needs_attention", "acceptable_for_rehab_depth"]
+AnalysisStatus = Literal["pending", "complete", "unavailable"]
 
+
+# --- WebSocket messages ---
 
 class FrameMessage(BaseModel):
-    """Sent by the client over the WebSocket every frame interval."""
+    """Sent by the client every frame interval."""
 
     type: Literal["frame"] = "frame"
     image: str  # base64 JPEG, with or without a data: URL prefix
 
 
+class SkipRestMessage(BaseModel):
+    type: Literal["skip_rest"] = "skip_rest"
+
+
 class ExerciseUpdate(BaseModel):
-    """Pushed over the WebSocket after each processed frame."""
+    """Pushed to the client after each processed frame."""
 
     status: SessionStatus
     exercise: ExerciseName
@@ -62,16 +71,68 @@ class ExerciseUpdate(BaseModel):
     rep_in_set: int = Field(ge=0)
     reps_per_set: int = Field(ge=1)
     rep_count: int = Field(ge=0)  # total reps completed this session
+    # Rule-based: drives rep counting and scoring
     phase: str
     # None when no person was detected in the frame
     form_score: float | None = Field(default=None, ge=0, le=100)
     joint_scores: dict[str, float] = {}
     fatigue_level: FatigueLevel
     fatigue_drift: float
-    ml_form_quality: FormQuality | None = None
+    # ML signals (squat only; None for push-ups or when a joint is occluded)
+    ml_phase: str | None = None
+    ml_phase_confidence: float | None = Field(default=None, ge=0, le=1)
+    ml_form_quality: FormQuality | None = None  # last completed rep
+    posture_check: PostureCheck | None = None  # last completed rep
+    anomaly_score: float | None = None
+    is_anomalous: bool = False
+    # Left/right differences above the threshold, in degrees, by joint label
+    asymmetry_detected: bool = False
+    asymmetry_details: dict[str, float] = {}
     rest_seconds_remaining: int | None = None
+    # LLM coaching for the set just completed, shown during rest (None while it loads)
+    set_coaching: str | None = None
     # 33 [x, y, visibility] triples in normalized image coordinates, for the skeleton overlay
     landmarks: list[tuple[float, float, float]] | None = None
+
+
+# --- REST requests and responses ---
+
+class CreateSessionRequest(BaseModel):
+    # Anonymous browser ID that ties sessions together for history (no accounts)
+    user_id: str | None = Field(default=None, max_length=64)
+
+
+class SessionIdRequest(BaseModel):
+    session_id: str
+
+
+class ProfileRequest(UserProfile):
+    session_id: str
+    disclaimer_acknowledged: bool = False
+
+
+class SessionCreated(BaseModel):
+    session_id: str
+
+
+class SessionDetails(BaseModel):
+    session_id: str
+    user_id: str | None
+    created_at: str  # ISO 8601
+    disclaimer_acknowledged: bool
+    profile: UserProfile | None
+    has_plan: bool
+    finished: bool
+
+
+class SuggestedPlan(BaseModel):
+    source_session_id: str
+    created_at: str
+    plan: RehabPlan
+
+
+class FromSuggestedRequest(BaseModel):
+    user_id: str = Field(max_length=64)
 
 
 class RepSummary(BaseModel):
@@ -81,6 +142,32 @@ class RepSummary(BaseModel):
     form_score: float = Field(ge=0, le=100)
     fatigue_drift: float
     fatigue_level: FatigueLevel
+    ml_form_quality: FormQuality | None = None
+    posture_check: PostureCheck | None = None
+    asymmetry: dict[str, float] = {}
+    is_anomalous: bool = False
+
+
+class SetCoaching(BaseModel):
+    exercise: ExerciseName
+    set_number: int
+    coaching_text: str
+
+
+class SessionAnalysis(BaseModel):
+    """Post-session analysis step 1 (LLM output)."""
+
+    summary: str = Field(min_length=1)
+    findings: list[str]
+    weak_joints: list[str] = []
+
+
+class TrendComparison(BaseModel):
+    """Post-session analysis step 2 (LLM output)."""
+
+    summary: str = Field(min_length=1)
+    trends: list[str]
+    recommendation: str
 
 
 class SessionReport(BaseModel):
@@ -94,6 +181,14 @@ class SessionReport(BaseModel):
     badges: list[str]
     reps: list[RepSummary]
     duration_seconds: int = Field(ge=0)
+    # Mean left/right difference per joint label across the session, in degrees
+    symmetry_summary: dict[str, float] = {}
+    anomaly_count: int = Field(default=0, ge=0)  # frames flagged as unusual movement
+    set_coaching: list[SetCoaching] = []
+    analysis_status: AnalysisStatus = "unavailable"
+    ai_session_analysis: SessionAnalysis | None = None
+    ai_trend_comparison: TrendComparison | None = None
+    ai_next_plan: RehabPlan | None = None
 
 
 class HistoryEntry(BaseModel):

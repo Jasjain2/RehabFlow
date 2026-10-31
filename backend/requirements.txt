@@ -12,3 +12,9 @@ numpy==2.4.6
 pandas==3.1.0
 scikit-learn==1.9.1
 joblib==1.6.0
+
+# Phase 5: API, pose estimation
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+mediapipe==1.2.0
+opencv-contrib-python==5.0.0.93

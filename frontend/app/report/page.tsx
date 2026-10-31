@@ -2,12 +2,17 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import AiAnalysis from '@/components/AiAnalysis';
 import NoSession from '@/components/NoSession';
 import ReportChart from '@/components/ReportChart';
 import { getReport } from '@/lib/api';
 import { EXERCISE_LABELS, errorMessage, formatDuration, formatPercent, scoreColor } from '@/lib/format';
 import { getCurrentSessionId } from '@/lib/storage';
 import type { ExerciseName, RepSummary, SessionReport } from '@/lib/types';
+
+// The AI analysis runs after the session ends; poll until it settles
+const ANALYSIS_POLL_MS = 2000;
+const ANALYSIS_MAX_POLLS = 45;
 
 export default function ReportPage() {
   const [sessionId, setSessionId] = useState<string | null | undefined>(undefined);
@@ -17,7 +22,16 @@ export default function ReportPage() {
   useEffect(() => {
     const id = getCurrentSessionId();
     setSessionId(id);
-    if (id) getReport(id).then(setReport, (err) => setError(errorMessage(err)));
+    if (!id) return;
+    let polls = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const load = () =>
+      getReport(id).then((r) => {
+        setReport(r);
+        if (r.analysis_status === 'pending' && ++polls < ANALYSIS_MAX_POLLS) timer = setTimeout(load, ANALYSIS_POLL_MS);
+      }, (err) => setError(errorMessage(err)));
+    load();
+    return () => clearTimeout(timer);
   }, []);
 
   if (sessionId === null) return <NoSession />;
@@ -60,6 +74,26 @@ export default function ReportPage() {
         )}
       </section>
 
+      <AiAnalysis report={report} />
+
+      {(Object.keys(report.symmetry_summary).length > 0 || report.anomaly_count > 0) && (
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="font-semibold">Movement checks</h2>
+          <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            {Object.entries(report.symmetry_summary).map(([joint, deg]) => (
+              <div key={joint}>
+                <dt className="capitalize text-slate-500">{joint} left/right difference</dt>
+                <dd className="text-lg font-semibold tabular-nums">{deg.toFixed(1)}°</dd>
+              </div>
+            ))}
+            <div>
+              <dt className="text-slate-500">Unusual-movement frames</dt>
+              <dd className="text-lg font-semibold tabular-nums">{report.anomaly_count}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
+
       {byExercise.length === 0 && (
         <p className="text-slate-600">No reps were recorded in this session.</p>
       )}
@@ -73,6 +107,13 @@ export default function ReportPage() {
             </p>
           </header>
           <ReportChart reps={reps} />
+          {report.set_coaching
+            .filter((c) => c.exercise === exercise)
+            .map((c) => (
+              <p key={c.set_number} className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+                <span className="font-medium">After set {c.set_number}:</span> {c.coaching_text}
+              </p>
+            ))}
         </section>
       ))}
     </div>

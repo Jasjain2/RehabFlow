@@ -98,22 +98,43 @@ def _combine(left: float, right: float, left_vis: float, right_vis: float) -> fl
     return left if left_vis >= right_vis else right
 
 
-def compute_angles(landmarks: Sequence[Landmark]) -> dict[str, float]:
-    """All joint angles for one frame, plus an `<angle>_asymmetry` (|left - right|) for each."""
+def _both_sides(landmarks: Sequence[Landmark]) -> tuple[dict[str, float], dict[str, float]]:
     if len(landmarks) != NUM_LANDMARKS:
         raise ValueError(f"Expected {NUM_LANDMARKS} landmarks, got {len(landmarks)}")
-
     midline_x = (landmarks[SIDES["left"]["hip"]].x + landmarks[SIDES["right"]["hip"]].x) / 2
-    left = _side_angles(landmarks, "left", midline_x)
-    right = _side_angles(landmarks, "right", midline_x)
+    return _side_angles(landmarks, "left", midline_x), _side_angles(landmarks, "right", midline_x)
 
+
+def _visibility(landmarks: Sequence[Landmark], side: str, angle: str) -> float:
+    return min(landmarks[SIDES[side][p]].visibility for p in ANGLE_POINTS[angle])
+
+
+def compute_angles(landmarks: Sequence[Landmark]) -> dict[str, float]:
+    """All joint angles for one frame, plus an `<angle>_asymmetry` (|left - right|) for each."""
+    left, right = _both_sides(landmarks)
     angles = {}
-    for name, points in ANGLE_POINTS.items():
-        left_vis = min(landmarks[SIDES["left"][p]].visibility for p in points)
-        right_vis = min(landmarks[SIDES["right"][p]].visibility for p in points)
+    for name in ANGLE_POINTS:
+        left_vis, right_vis = _visibility(landmarks, "left", name), _visibility(landmarks, "right", name)
         angles[name] = _combine(left[name], right[name], left_vis, right_vis)
         angles[f"{name}_asymmetry"] = abs(left[name] - right[name])
     return angles
+
+
+def bilateral_differences(landmarks: Sequence[Landmark], angle_names: Sequence[str]) -> dict[str, float]:
+    """|left - right| in degrees for each angle, only where both sides are clearly visible.
+
+    With a side-on camera the far limbs are partly occluded and their landmarks are
+    unreliable, so an occluded side must not be read as an asymmetry.
+    """
+    left, right = _both_sides(landmarks)
+    diffs = {}
+    for name in angle_names:
+        if min(_visibility(landmarks, "left", name), _visibility(landmarks, "right", name)) < VISIBILITY_THRESHOLD:
+            continue
+        diff = abs(left[name] - right[name])
+        if not math.isnan(diff):
+            diffs[name] = diff
+    return diffs
 
 
 def score_joint(angle: float, ideal_range: Sequence[float]) -> tuple[float, float]:

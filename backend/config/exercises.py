@@ -45,7 +45,10 @@ EXERCISES = {
                 "trunk_lean": [0, 30],
             },
         },
-        "ml_form_quality": True,
+        # Left/right angle pairs checked for asymmetry: display label -> angle
+        "asymmetry_joints": {"knee": "knee_flexion", "hip": "hip_flexion"},
+        # The trained phase detector, form classifier, and anomaly detector cover this exercise
+        "ml_models": True,
     },
     "push_up": {
         "phases": ["up", "down"],
@@ -71,7 +74,9 @@ EXERCISES = {
                 "body_straightness": [160, 180],
             },
         },
-        "ml_form_quality": False,
+        "asymmetry_joints": {"elbow": "elbow_flexion", "shoulder": "shoulder_flexion"},
+        # No labeled push-up data yet: scoring and phases are rule-based only
+        "ml_models": False,
     },
 }
 

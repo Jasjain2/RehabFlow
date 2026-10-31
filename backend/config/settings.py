@@ -34,6 +34,31 @@ FATIGUE_BASELINE_REPS = 3
 FATIGUE_MODERATE_DRIFT = 0.15
 FATIGUE_HIGH_DRIFT = 0.30
 
+# Models
+MODELS_DIR = BACKEND_DIR / "models"
+POSE_MODEL_PATH = MODELS_DIR / "pose_landmarker_lite.task"
+
+# Live ML signals. Rules always win for scoring and rep counting.
+# A rep the ML model calls "bad" but the rules score above this is shown as acceptable:
+# the training data labels any partial-depth squat as bad, which is wrong for rehab.
+ML_FORM_OVERRIDE_SCORE = 80
+ASYMMETRY_THRESHOLD_DEG = 10.0
+# Asymmetry and anomaly flags must persist this many consecutive frames before being
+# shown; the anomaly detector flags ~10% of normal frames from unseen subjects.
+SIGNAL_CONSECUTIVE_FRAMES = 3
+
+# Gamification
+XP_PER_REP = 10
+XP_GOOD_FORM_BONUS = 50
+XP_GOOD_FORM_THRESHOLD = 80
+XP_PLAN_COMPLETE_BONUS = 100
+BADGE_FORM_MASTER_SCORE = 90
+
+# Post-session analysis: how many previous sessions to compare against
+ANALYSIS_HISTORY_SESSIONS = 5
+
+FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(",")
+
 # Profile validation
 MIN_AGE = 10
 MAX_AGE = 100

@@ -5,17 +5,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import CameraFeed from '@/components/CameraFeed';
 import FatigueAlert from '@/components/FatigueAlert';
 import FormScore from '@/components/FormScore';
+import LiveSignals from '@/components/LiveSignals';
 import NoSession from '@/components/NoSession';
+import RestOverlay from '@/components/RestOverlay';
 import { connectExerciseStream, finishSession, getPlan } from '@/lib/api';
 import { EXERCISE_LABELS, errorMessage } from '@/lib/format';
 import { getCurrentSessionId } from '@/lib/storage';
-import type { ExerciseUpdate, FrameMessage, RehabPlan } from '@/lib/types';
+import type { ExerciseUpdate, FrameMessage, RehabPlan, SkipRestMessage } from '@/lib/types';
 
 const FRAME_INTERVAL_MS = 400;
 // Skip a frame rather than queue it when the connection is backed up (~2 frames)
 const MAX_BUFFERED_BYTES = 200_000;
-// Rule-based score this high plus an ML "bad" verdict means the posture pattern looks off
-const ML_DISAGREEMENT_SCORE = 80;
 
 type Connection = 'connecting' | 'open' | 'closed';
 
@@ -58,6 +58,11 @@ export default function ExercisePage() {
     ws.send(JSON.stringify(message));
   }, []);
 
+  const skipRest = useCallback(() => {
+    const message: SkipRestMessage = { type: 'skip_rest' };
+    wsRef.current?.send(JSON.stringify(message));
+  }, []);
+
   const finish = useCallback(async () => {
     if (!sessionId || finishingRef.current) return;
     finishingRef.current = true;
@@ -82,8 +87,6 @@ export default function ExercisePage() {
   const exerciseIndex = update?.exercise_index ?? 0;
   const currentExercise = plan?.exercises[exerciseIndex];
   const resting = update?.status === 'resting';
-  const showMlWarning =
-    update?.ml_form_quality === 'bad' && update.form_score !== null && update.form_score > ML_DISAGREEMENT_SCORE;
 
   return (
     <div className="space-y-4">
@@ -124,13 +127,7 @@ export default function ExercisePage() {
             onFrame={sendFrame}
             landmarks={update?.landmarks}
           />
-          {resting && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-slate-900/80 text-white">
-              <p className="text-lg">Rest</p>
-              <p className="text-6xl font-semibold tabular-nums">{update.rest_seconds_remaining ?? 0}s</p>
-              <p className="mt-2 text-sm text-slate-300">Next: set {update.set_number} of {update.total_sets}</p>
-            </div>
-          )}
+          {resting && <RestOverlay update={update} onSkip={skipRest} />}
         </div>
 
         <div className="space-y-4">
@@ -138,19 +135,14 @@ export default function ExercisePage() {
           <div className="grid grid-cols-2 gap-3 text-center">
             <Stat label="Set" value={update ? `${update.set_number} / ${update.total_sets}` : '–'} />
             <Stat label="Rep" value={update ? `${update.rep_in_set} / ${update.reps_per_set}` : '–'} />
-            <Stat label="Phase" value={update?.phase ?? '–'} />
+            <Stat label="Phase" value={update?.phase ?? '–'} detail={mlPhaseDetail(update)} />
             <Stat label="Total reps" value={update ? String(update.rep_count) : '–'} />
           </div>
           {update?.fatigue_level === 'building_baseline' && (
             <p className="text-sm text-slate-600">Measuring your baseline form over the first few reps…</p>
           )}
           {update && <FatigueAlert level={update.fatigue_level} drift={update.fatigue_drift} />}
-          {showMlWarning && (
-            <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              Your overall score looks okay but your posture pattern suggests a form issue. Check your depth
-              and trunk position.
-            </p>
-          )}
+          {update && <LiveSignals update={update} />}
           {currentExercise && currentExercise.coaching_cues.length > 0 && (
             <section className="rounded-lg border border-slate-200 bg-white p-4">
               <h2 className="text-sm font-medium text-slate-700">Coaching cues</h2>
@@ -167,11 +159,18 @@ export default function ExercisePage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/** "ML: descending 92%" — the ML phase detector runs alongside the rule-based phase */
+function mlPhaseDetail(update: ExerciseUpdate | null): string | undefined {
+  if (!update?.ml_phase || update.ml_phase_confidence === null) return undefined;
+  return `ML: ${update.ml_phase} ${Math.round(update.ml_phase_confidence * 100)}%`;
+}
+
+function Stat({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="mt-0.5 text-lg font-semibold capitalize tabular-nums">{value}</p>
+      {detail && <p className="text-xs tabular-nums text-slate-500">{detail}</p>}
     </div>
   );
 }

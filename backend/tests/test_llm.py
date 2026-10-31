@@ -8,7 +8,9 @@ from pydantic import ValidationError
 
 from config import settings
 from core.schema import InjuryType, RehabPlan, UserProfile
+from llm.analysis import run_session_analysis
 from llm.client import LLMError, call_groq
+from llm.coaching import FALLBACK_COACHING, generate_set_coaching
 from llm.fallbacks import DEFAULT_FALLBACK, FALLBACK_DIR, FALLBACK_FILES, load_fallback_plan
 from llm.planner import generate_plan
 from llm.prompts import build_plan_prompt
@@ -148,3 +150,64 @@ def test_missing_api_key_uses_fallback_without_calling_groq(monkeypatch):
     plan = asyncio.run(generate_plan(PROFILE, http_client=groq.client))
     assert plan == load_fallback_plan("upper_body")
     assert groq.requests == []
+
+
+# --- Set coaching ---
+
+COACHING_PAYLOAD = {"exercise": "squat", "set_number": 1, "total_sets": 2, "reps": [{"rep": 1, "form_score": 80}]}
+
+
+def test_coaching_falls_back_without_api_key(monkeypatch):
+    monkeypatch.setattr(settings, "GROQ_API_KEY", "")
+    assert asyncio.run(generate_set_coaching(COACHING_PAYLOAD)) == FALLBACK_COACHING
+
+
+def test_coaching_is_limited_to_three_sentences(sleeps):
+    text = "Chest up. Knees out. Slow down. Breathe. Drive through heels."
+    groq = FakeGroq(groq_response(json.dumps({"coaching": text})))
+    result = asyncio.run(generate_set_coaching(COACHING_PAYLOAD, http_client=groq.client))
+    assert result == "Chest up. Knees out. Slow down."
+    assert '"form_score": 80' in json.loads(groq.requests[0].content)["messages"][0]["content"]
+
+
+# --- Post-session analysis chain ---
+
+ANALYSIS = {"summary": "Form dipped in set 2.", "findings": ["Trunk lean rose"], "weak_joints": ["trunk_lean"]}
+COMPARISON = {"summary": "Improving.", "trends": ["Avg 72 -> 84"], "recommendation": "Add 2 reps"}
+
+
+def run_analysis(groq: FakeGroq, history: list[dict]):
+    return asyncio.run(run_session_analysis({"exercises": []}, {"avg_form_score": 84}, history, PROFILE,
+                                            RehabPlan.model_validate(VALID_PLAN), http_client=groq.client))
+
+
+def test_analysis_chain_runs_all_three_steps_with_history(sleeps):
+    groq = FakeGroq(*(groq_response(json.dumps(body)) for body in (ANALYSIS, COMPARISON, VALID_PLAN)))
+    result = run_analysis(groq, history=[{"avg_form_score": 72}])
+    assert result.analysis.weak_joints == ["trunk_lean"]
+    assert result.comparison.recommendation == "Add 2 reps"
+    assert result.next_plan == RehabPlan.model_validate(VALID_PLAN)
+    # Each step's output feeds the next prompt
+    step3_prompt = json.loads(groq.requests[2].content)["messages"][0]["content"]
+    assert "Trunk lean rose" in step3_prompt and "Add 2 reps" in step3_prompt
+
+
+def test_analysis_skips_comparison_without_history(sleeps):
+    groq = FakeGroq(groq_response(json.dumps(ANALYSIS)), groq_response(json.dumps(VALID_PLAN)))
+    result = run_analysis(groq, history=[])
+    assert result.comparison is None and result.next_plan is not None
+    assert len(groq.requests) == 2
+
+
+def test_failed_step_one_skips_the_whole_analysis(sleeps):
+    groq = FakeGroq(*[groq_response("not json")] * 3)
+    result = run_analysis(groq, history=[{"avg_form_score": 72}])
+    assert (result.analysis, result.comparison, result.next_plan) == (None, None, None)
+    assert len(groq.requests) == 3
+
+
+def test_failed_middle_step_keeps_earlier_output(sleeps):
+    groq = FakeGroq(groq_response(json.dumps(ANALYSIS)), *[groq_response("{}")] * 3,
+                    groq_response(json.dumps(VALID_PLAN)))
+    result = run_analysis(groq, history=[{"avg_form_score": 72}])
+    assert result.analysis is not None and result.comparison is None and result.next_plan is not None

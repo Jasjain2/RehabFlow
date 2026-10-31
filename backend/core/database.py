@@ -13,11 +13,14 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from config.settings import DATABASE_URL
-from core.schema import FatigueLevel
+from core.schema import AnalysisStatus, FatigueLevel
 
-_FATIGUE_LEVELS_SQL = ", ".join(f"'{level}'" for level in get_args(FatigueLevel))
+
+def _sql_in(literal_type) -> str:
+    return ", ".join(f"'{value}'" for value in get_args(literal_type))
 
 
 class Base(DeclarativeBase):
@@ -29,9 +32,11 @@ class SessionRecord(Base):
     # Profile columns are nullable: a session is created before the profile is saved
     __table_args__ = (
         CheckConstraint("pain_tolerance BETWEEN 1 AND 10", name="ck_sessions_pain_tolerance"),
+        CheckConstraint(f"analysis_status IN ({_sql_in(AnalysisStatus)})", name="ck_sessions_analysis_status"),
     )
 
     id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str | None] = mapped_column(index=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     disclaimer_acknowledged: Mapped[bool] = mapped_column(default=False)
     age: Mapped[int | None]
@@ -40,21 +45,27 @@ class SessionRecord(Base):
     pain_tolerance: Mapped[int | None]
     difficulty: Mapped[str | None]
     plan_json: Mapped[str | None] = mapped_column(Text)
+    # Set when the live stream first connects and when the session is finished
+    started_at: Mapped[datetime | None]
+    finished_at: Mapped[datetime | None]
+    analysis_status: Mapped[str | None]
 
     reps: Mapped[list["RepRecord"]] = relationship(back_populates="session", order_by="RepRecord.id")
     report: Mapped["ReportRecord | None"] = relationship(back_populates="session")
+    set_coaching: Mapped[list["SetCoachingRecord"]] = relationship(order_by="SetCoachingRecord.id")
+    analysis: Mapped["SessionAnalysisRecord | None"] = relationship()
 
 
 class RepRecord(Base):
     __tablename__ = "reps"
     __table_args__ = (
         CheckConstraint("form_score BETWEEN 0 AND 100", name="ck_reps_form_score"),
-        CheckConstraint(f"fatigue_level IN ({_FATIGUE_LEVELS_SQL})", name="ck_reps_fatigue_level"),
+        CheckConstraint(f"fatigue_level IN ({_sql_in(FatigueLevel)})", name="ck_reps_fatigue_level"),
         CheckConstraint("ml_form_quality IN ('good', 'bad')", name="ck_reps_ml_form_quality"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"))
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
     exercise: Mapped[str]
     set_number: Mapped[int]
     rep_number: Mapped[int]
@@ -63,11 +74,31 @@ class RepRecord(Base):
     fatigue_level: Mapped[str]
     phase_at_completion: Mapped[str]
     joint_scores_json: Mapped[str | None] = mapped_column(Text)
-    # NULL for exercises without an ML form classifier (push-ups)
+    # ML columns are NULL for exercises without trained models (push-ups)
     ml_form_quality: Mapped[str | None]
+    ml_phase_at_completion: Mapped[str | None]
+    ml_phase_confidence: Mapped[float | None]
+    # Mean left/right difference per joint label during the rep
+    asymmetry_json: Mapped[str | None] = mapped_column(Text)
+    # Lowest (most anomalous) Isolation Forest score during the rep
+    anomaly_score: Mapped[float | None]
+    is_anomalous: Mapped[bool] = mapped_column(default=False)
+    anomalous_frames: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     session: Mapped[SessionRecord] = relationship(back_populates="reps")
+
+
+class SetCoachingRecord(Base):
+    __tablename__ = "set_coaching"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
+    exercise: Mapped[str]
+    set_number: Mapped[int]
+    coaching_text: Mapped[str] = mapped_column(Text)
+    rep_data_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 class ReportRecord(Base):
@@ -83,16 +114,34 @@ class ReportRecord(Base):
     xp_earned: Mapped[int] = mapped_column(default=0)
     badges_json: Mapped[str | None] = mapped_column(Text)
     duration_seconds: Mapped[int | None]
+    anomaly_count: Mapped[int] = mapped_column(default=0)
+    symmetry_summary_json: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     session: Mapped[SessionRecord] = relationship(back_populates="report")
+
+
+class SessionAnalysisRecord(Base):
+    __tablename__ = "session_analysis"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), unique=True)
+    analysis_json: Mapped[str] = mapped_column(Text)
+    comparison_json: Mapped[str | None] = mapped_column(Text)
+    # Suggested plan for the user's next session
+    next_plan_json: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 def make_engine(url: str = DATABASE_URL) -> Engine:
     if not url.startswith("sqlite"):
         return create_engine(url)
 
-    engine = create_engine(url, connect_args={"check_same_thread": False})
+    kwargs: dict = {"connect_args": {"check_same_thread": False}}
+    if url in ("sqlite://", "sqlite:///:memory:"):
+        # One shared connection, or each thread would get its own empty database
+        kwargs["poolclass"] = StaticPool
+    engine = create_engine(url, **kwargs)
 
     # SQLite ignores foreign keys unless enabled on every connection
     @event.listens_for(engine, "connect")
@@ -106,5 +155,5 @@ def init_db(engine: Engine) -> None:
     Base.metadata.create_all(engine)
 
 
-engine = make_engine()
-SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+def make_session_factory(engine: Engine) -> sessionmaker:
+    return sessionmaker(bind=engine, expire_on_commit=False)

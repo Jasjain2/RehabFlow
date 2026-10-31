@@ -25,7 +25,13 @@ class FatigueDetector:
         drift = (self.baseline - rep_score) / self.baseline if self.baseline > 0 else 0.0
         self.current_drift = round(drift, 9)
         self.max_drift = max(self.max_drift, self.current_drift)
+        return self.level
 
+    @property
+    def level(self) -> FatigueLevel:
+        """Level as of the most recent rep."""
+        if self.baseline is None:
+            return "building_baseline"
         if self.current_drift >= FATIGUE_HIGH_DRIFT:
             return "high"
         if self.current_drift >= FATIGUE_MODERATE_DRIFT:
