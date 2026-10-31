@@ -1,0 +1,65 @@
+
+======================================================================
+PHASE DETECTOR  18302 frames, 17 subjects, GroupKFold(5) by subject
+======================================================================
+  fold 1: macro F1 0.8010  test subjects ['p06', 'p10', 'p16']
+  fold 2: macro F1 0.9316  test subjects ['p03', 'p07', 'p17']
+  fold 3: macro F1 0.8272  test subjects ['p01', 'p05', 'p12']
+  fold 4: macro F1 0.7982  test subjects ['p04', 'p11', 'p13', 'p18']
+  fold 5: macro F1 0.9103  test subjects ['p02', 'p08', 'p09', 'p15']
+
+Phase Detector F1 (macro): 0.8537 ± 0.0563
+
+              precision    recall  f1-score   support
+
+    standing     0.9995    0.9998    0.9997      5893
+  descending     0.6654    0.6831    0.6741      3525
+      bottom     0.9977    0.9948    0.9962      4270
+   ascending     0.7545    0.7408    0.7476      4614
+
+    accuracy                         0.8724     18302
+   macro avg     0.8543    0.8546    0.8544     18302
+weighted avg     0.8730    0.8724    0.8726     18302
+
+Confusion matrix (rows = true, cols = predicted): ['standing', 'descending', 'bottom', 'ascending']
+[[5892    0    0    1]
+ [   1 2408    5 1111]
+ [   0   22 4248    0]
+ [   2 1189    5 3418]]
+
+Single-frame inference: 7.08 ms (median)
+
+======================================================================
+FORM QUALITY (squat, rep level)  226 reps (33 bad), 17 subjects, 4 with bad-form data
+Features: ['knee_min', 'hip_min', 'trunk_max', 'knee_rom']
+StratifiedGroupKFold(4) by subject: each fold holds out one bad-form subject
+======================================================================
+  fold 1: F1 1.0000  bad-form test subject ['p04']  test reps 54 (6 bad)
+  fold 2: F1 0.8571  bad-form test subject ['p02']  test reps 43 (3 bad)
+  fold 3: F1 0.4286  bad-form test subject ['p03']  test reps 62 (11 bad)
+  fold 4: F1 0.6047  bad-form test subject ['p01']  test reps 67 (13 bad)
+
+Form Quality F1 (rep level, bad = positive): 0.7226 ± 0.2210
+
+              precision    recall  f1-score   support
+
+        good     0.9563    0.9067    0.9309       193
+         bad     0.5814    0.7576    0.6579        33
+
+    accuracy                         0.8850       226
+   macro avg     0.7688    0.8322    0.7944       226
+weighted avg     0.9015    0.8850    0.8910       226
+
+Out-of-fold reps flagged bad: shallow 0.6522, good morning 1.0000, standard (false alarms) 0.0933
+
+Single-rep inference: 6.70 ms (median)
+
+======================================================================
+ANOMALY DETECTOR (Isolation Forest)  15470 standard-squat frames, 17 subjects, contamination=0.05
+======================================================================
+  Held-out standard frames flagged (GroupKFold 5 by subject): 0.1038 ± 0.1061
+  Frames flagged by final model: shallow 0.1690, good morning 0.4489 (error types never seen in training)
+
+Single-frame inference: 7.53 ms (median)
+
+Saved models and model_summary.json to C:\Users\dhira\rehabflow-v2\backend\models

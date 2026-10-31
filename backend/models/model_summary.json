@@ -1,0 +1,74 @@
+{
+  "phase_detector": {
+    "f1": 0.8537,
+    "std": 0.0563,
+    "n_samples": 18302,
+    "subjects": 17,
+    "validation": "GroupKFold 5-fold by subject",
+    "metric": "macro F1",
+    "per_class_f1": {
+      "standing": 0.9997,
+      "descending": 0.6741,
+      "bottom": 0.9962,
+      "ascending": 0.7476
+    },
+    "inference_ms_median": 7.08
+  },
+  "form_quality_rep_level": {
+    "f1": 0.7226,
+    "std": 0.221,
+    "n_samples": 226,
+    "n_bad": 33,
+    "subjects": 17,
+    "bad_form_subjects": 4,
+    "validation": "StratifiedGroupKFold 4-fold by subject (one bad-form subject held out per fold)",
+    "positive_class": "bad",
+    "features": [
+      "knee_min",
+      "hip_min",
+      "trunk_max",
+      "knee_rom"
+    ],
+    "fold_f1": [
+      1.0,
+      0.8571,
+      0.4286,
+      0.6047
+    ],
+    "flagged_bad_rate_by_type": {
+      "shallow": 0.6522,
+      "good_morning": 1.0,
+      "standard": 0.0933
+    },
+    "inference_ms_median": 6.7
+  },
+  "anomaly_detector": {
+    "contamination": 0.05,
+    "n_estimators": 100,
+    "n_training_samples": 15470,
+    "features": [
+      "knee_flexion",
+      "hip_flexion",
+      "elbow_flexion",
+      "shoulder_flexion",
+      "body_straightness",
+      "trunk_lean",
+      "knee_valgus"
+    ],
+    "subjects": 17,
+    "held_out_standard_flag_rate": 0.1038,
+    "held_out_standard_flag_rate_std": 0.1061,
+    "flag_rate_by_error_type": {
+      "shallow": 0.169,
+      "good_morning": 0.4489
+    },
+    "inference_ms_median": 7.53
+  },
+  "dataset": "Zenodo squat posture (DOI: 10.5281/zenodo.18859797)",
+  "subjects": 17,
+  "squat_types": [
+    "good_morning",
+    "shallow",
+    "standard"
+  ]
+}
