@@ -11,7 +11,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{(BACKEND_DIR / 'rehabflow.
 
 # LLM plan generation
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = "llama-3.3-70b-versatile"
+# Groq retires models; override with GROQ_MODEL in .env (list: GET /openai/v1/models)
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 # Low for consistent plans, but not 0 so similar profiles don't get identical plans
 GROQ_TEMPERATURE = 0.3
 GROQ_MAX_TOKENS = 2048

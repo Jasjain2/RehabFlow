@@ -98,7 +98,7 @@ def test_request_uses_json_mode_and_settings(sleeps):
     asyncio.run(call_groq("prompt", RehabPlan.model_validate, http_client=groq.client))
     body = json.loads(groq.requests[0].content)
     assert body["response_format"] == {"type": "json_object"}
-    assert body["model"] == "llama-3.3-70b-versatile"
+    assert body["model"] == settings.GROQ_MODEL
     assert body["temperature"] == 0.3
     assert groq.requests[0].headers["Authorization"] == "Bearer test-key"
 
