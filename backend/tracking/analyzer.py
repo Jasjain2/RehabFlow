@@ -98,7 +98,8 @@ def _combine(left: float, right: float, left_vis: float, right_vis: float) -> fl
     return left if left_vis >= right_vis else right
 
 
-def _both_sides(landmarks: Sequence[Landmark]) -> tuple[dict[str, float], dict[str, float]]:
+def side_angles(landmarks: Sequence[Landmark]) -> tuple[dict[str, float], dict[str, float]]:
+    """(left, right) angles for one frame, before the sides are combined."""
     if len(landmarks) != NUM_LANDMARKS:
         raise ValueError(f"Expected {NUM_LANDMARKS} landmarks, got {len(landmarks)}")
     midline_x = (landmarks[SIDES["left"]["hip"]].x + landmarks[SIDES["right"]["hip"]].x) / 2
@@ -111,7 +112,7 @@ def _visibility(landmarks: Sequence[Landmark], side: str, angle: str) -> float:
 
 def compute_angles(landmarks: Sequence[Landmark]) -> dict[str, float]:
     """All joint angles for one frame, plus an `<angle>_asymmetry` (|left - right|) for each."""
-    left, right = _both_sides(landmarks)
+    left, right = side_angles(landmarks)
     angles = {}
     for name in ANGLE_POINTS:
         left_vis, right_vis = _visibility(landmarks, "left", name), _visibility(landmarks, "right", name)
@@ -120,13 +121,18 @@ def compute_angles(landmarks: Sequence[Landmark]) -> dict[str, float]:
     return angles
 
 
+def angle_visibility(landmarks: Sequence[Landmark], angle: str) -> float:
+    """Visibility of the better-seen side for the points that define `angle`."""
+    return max(_visibility(landmarks, "left", angle), _visibility(landmarks, "right", angle))
+
+
 def bilateral_differences(landmarks: Sequence[Landmark], angle_names: Sequence[str]) -> dict[str, float]:
     """|left - right| in degrees for each angle, only where both sides are clearly visible.
 
     With a side-on camera the far limbs are partly occluded and their landmarks are
     unreliable, so an occluded side must not be read as an asymmetry.
     """
-    left, right = _both_sides(landmarks)
+    left, right = side_angles(landmarks)
     diffs = {}
     for name in angle_names:
         if min(_visibility(landmarks, "left", name), _visibility(landmarks, "right", name)) < VISIBILITY_THRESHOLD:

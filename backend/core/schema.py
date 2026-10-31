@@ -44,6 +44,8 @@ class RehabPlan(BaseModel):
 SessionStatus = Literal["exercising", "resting", "complete"]
 # Rep-level verdict shown to the user, combining the ML classifier with the rule score
 PostureCheck = Literal["good", "needs_attention", "acceptable_for_rehab_depth"]
+# Why a frame couldn't be tracked: nobody in frame, or the exercise's key joints out of view
+TrackingIssue = Literal["no_person", "body_not_visible"]
 AnalysisStatus = Literal["pending", "complete", "unavailable"]
 
 
@@ -91,6 +93,8 @@ class ExerciseUpdate(BaseModel):
     rest_seconds_remaining: int | None = None
     # LLM coaching for the set just completed, shown during rest (None while it loads)
     set_coaching: str | None = None
+    # Set while exercising when a frame couldn't be counted or scored
+    tracking_issue: TrackingIssue | None = None
     # 33 [x, y, visibility] triples in normalized image coordinates, for the skeleton overlay
     landmarks: list[tuple[float, float, float]] | None = None
 

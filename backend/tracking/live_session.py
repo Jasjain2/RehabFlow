@@ -15,13 +15,23 @@ from config.exercises import get_exercise
 from core.exercise_queue import ExerciseQueue
 from core.report import posture_check
 from core.schema import ExerciseUpdate, FatigueLevel, FormQuality, PostureCheck, RehabPlan
-from tracking.analyzer import Landmark, bilateral_differences, compute_angles, score_frame
+from tracking.analyzer import (
+    SIDES,
+    Landmark,
+    angle_visibility,
+    bilateral_differences,
+    compute_angles,
+    score_frame,
+    side_angles,
+)
 from tracking.fatigue import FatigueDetector
 from tracking.features import extract_features, rep_summary_features
 from tracking.ml import MLModels, PhasePrediction
 from tracking.rep_counter import RepCounter
 
 log = logging.getLogger(__name__)
+# Per-frame diagnostics, enabled with FRAME_TRACE=1 (see api/logging_config.py)
+frame_log = logging.getLogger("rehabflow.frames")
 
 
 @dataclass
@@ -117,13 +127,22 @@ class LiveSession:
         exercise = self.queue.current
         config = get_exercise(exercise.name)
         update = self._base_update(now)
-        if landmarks is None or self.queue.status != "exercising":
-            if landmarks is not None:
-                update.landmarks = [(p.x, p.y, p.visibility) for p in landmarks]
+        if landmarks is not None:
+            update.landmarks = [(p.x, p.y, p.visibility) for p in landmarks]
+        if self.queue.status != "exercising":
+            return FrameResult(update)
+        primary = config["primary_angle"]
+        if landmarks is None:
+            update.tracking_issue = "no_person"
+        elif (visibility := angle_visibility(landmarks, primary)) < settings.MIN_TRACKING_VISIBILITY:
+            update.tracking_issue = "body_not_visible"
+            frame_log.debug("%s joints not visible (best side %.2f)", primary, visibility)
+        if update.tracking_issue:
+            frame_log.debug("not tracked: %s", update.tracking_issue)
             return FrameResult(update)
 
         angles = compute_angles(landmarks)
-        rep_done = self._counter.update(angles[config["primary_angle"]])
+        rep_done = self._counter.update(angles[primary])
         phase = self._counter.phase
         frame = score_frame(exercise.name, phase, angles)
 
@@ -134,6 +153,9 @@ class LiveSession:
             if ml_phase and ml_phase.phase != phase:
                 self.phase_disagreements += 1
                 log.debug("Phase disagreement: rules=%s ml=%s (%.2f)", phase, ml_phase.phase, ml_phase.confidence)
+
+        if frame_log.isEnabledFor(logging.DEBUG):
+            self._trace(landmarks, angles, primary, ml_phase)
 
         diffs = bilateral_differences(landmarks, list(config["asymmetry_joints"].values()))
         by_label = {label: diffs[angle] for label, angle in config["asymmetry_joints"].items() if angle in diffs}
@@ -179,6 +201,17 @@ class LiveSession:
         update.asymmetry_details = over if asymmetry_shown else {}
         update.landmarks = [(p.x, p.y, p.visibility) for p in landmarks]
         return result
+
+    def _trace(self, landmarks, angles: dict[str, float], primary: str, ml_phase: PhasePrediction | None) -> None:
+        left, right = side_angles(landmarks)
+        joints = ("hip", "knee", "ankle") if primary == "knee_flexion" else ("shoulder", "elbow", "wrist")
+        vis = {side: "/".join(f"{landmarks[SIDES[side][j]].visibility:.2f}" for j in joints) for side in SIDES}
+        frame_log.debug(
+            "%s=%.0f (L %.0f vis %s | R %.0f vis %s) hip=%.0f trunk=%.0f | obs=%s phase=%s pending=%s | ml=%s",
+            primary, angles[primary], left[primary], vis["left"], right[primary], vis["right"],
+            angles["hip_flexion"], angles["trunk_lean"], self._counter.last_observation, self._counter.phase,
+            self._counter.pending, f"{ml_phase.phase} {ml_phase.confidence:.2f}" if ml_phase else "-",
+        )
 
     def _start_set_if_new(self) -> None:
         key = (self.queue.exercise_index, self.queue.set_number)

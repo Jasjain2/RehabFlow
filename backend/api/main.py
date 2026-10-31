@@ -178,6 +178,8 @@ async def exercise_stream(ws: WebSocket, session_id: str) -> None:
     live = LiveSession(plan, get_ml_models())
     pose = get_pose_estimator()
     coaching_tasks: set[asyncio.Task] = set()
+    frames = frames_with_pose = 0
+    processing_s = 0.0
     log.info("Session %s stream connected", session_id)
     try:
         while True:
@@ -189,9 +191,13 @@ async def exercise_stream(ws: WebSocket, session_id: str) -> None:
                 live.skip_rest()
                 continue
 
+            start = time.perf_counter()
             result = await run_in_threadpool(_process_frame, pose, live, message.image)
+            processing_s += time.perf_counter() - start
             if result is None:
                 continue
+            frames += 1
+            frames_with_pose += result.update.landmarks is not None
             if result.completed_rep:
                 with state.db_session() as db:
                     state.add_rep(db, session_id, result.completed_rep)
@@ -204,8 +210,9 @@ async def exercise_stream(ws: WebSocket, session_id: str) -> None:
                 task.add_done_callback(coaching_tasks.discard)
             await ws.send_text(result.update.model_dump_json())
     except WebSocketDisconnect:
-        log.info("Session %s stream disconnected (%d reps, %d ML/rule phase disagreements)",
-                 session_id, live.queue.total_reps, live.phase_disagreements)
+        log.info("Session %s stream disconnected: %d frames, %d with a person detected, %.0fms avg processing, "
+                 "%d reps, %d ML/rule phase disagreements", session_id, frames, frames_with_pose,
+                 processing_s / max(frames, 1) * 1000, live.queue.total_reps, live.phase_disagreements)
 
 
 async def _analyze_session(session_id: str) -> None:

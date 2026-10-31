@@ -1,6 +1,7 @@
 """JSON-lines logging, so LLM latency, retries, and session events are machine-readable."""
 import json
 import logging
+import os
 from datetime import datetime, timezone
 
 
@@ -25,3 +26,6 @@ def configure_logging(level: int = logging.INFO) -> None:
     root.setLevel(level)
     # httpx logs every request URL at INFO; keep only our own summaries
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    # One line per processed frame: angles, visibility, phase observations, counter state
+    if os.getenv("FRAME_TRACE") == "1":
+        logging.getLogger("rehabflow.frames").setLevel(logging.DEBUG)

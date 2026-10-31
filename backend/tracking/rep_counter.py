@@ -50,10 +50,13 @@ class RepCounter:
         self._candidate: str | None = None
         self._streak = 0
         self._previous_angle: float | None = None
+        # Raw per-frame observation, kept for diagnostics
+        self.last_observation: str | None = None
 
     def update(self, angle: float) -> bool:
         """Feed the primary joint angle for one frame. Returns True if a rep was just completed."""
         observed = classify_phase(self.config, angle, self._previous_angle)
+        self.last_observation = observed
         if not math.isnan(angle):
             self._previous_angle = angle
         return self.observe(observed)
@@ -76,6 +79,11 @@ class RepCounter:
             return False
 
         return self._transition(observed)
+
+    @property
+    def pending(self) -> str:
+        """Phase waiting to be committed and how many frames it has, e.g. 'bottom x2'."""
+        return f"{self._candidate} x{self._streak}" if self._candidate else "-"
 
     def _transition(self, phase: str) -> bool:
         self.phase = phase

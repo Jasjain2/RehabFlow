@@ -9,6 +9,8 @@ export type FormQuality = 'good' | 'bad';
 export type SessionStatus = 'exercising' | 'resting' | 'complete';
 export type PostureCheck = 'good' | 'needs_attention' | 'acceptable_for_rehab_depth';
 export type AnalysisStatus = 'pending' | 'complete' | 'unavailable';
+/** Why a frame couldn't be tracked: nobody in frame, or the exercise's key joints out of view */
+export type TrackingIssue = 'no_person' | 'body_not_visible';
 
 export interface UserProfile {
   age: number;
@@ -76,6 +78,8 @@ export interface ExerciseUpdate {
   rest_seconds_remaining: number | null;
   /** LLM coaching for the set just completed; null while it loads */
   set_coaching: string | null;
+  /** Set while exercising when a frame couldn't be counted or scored */
+  tracking_issue: TrackingIssue | null;
   landmarks: LandmarkPoint[] | null;
 }
 

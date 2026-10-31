@@ -46,6 +46,10 @@ ASYMMETRY_THRESHOLD_DEG = 10.0
 # Asymmetry and anomaly flags must persist this many consecutive frames before being
 # shown; the anomaly detector flags ~10% of normal frames from unseen subjects.
 SIGNAL_CONSECUTIVE_FRAMES = 3
+# Frames where the joints of the exercise's primary angle (hip/knee/ankle for squats) are
+# below this visibility on both sides are not counted or scored. MediaPipe still returns
+# positions for joints out of frame, but it guesses them, usually as straight limbs.
+MIN_TRACKING_VISIBILITY = 0.25
 
 # Gamification
 XP_PER_REP = 10

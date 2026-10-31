@@ -3,7 +3,7 @@ import pytest
 from config.settings import MODELS_DIR, SIGNAL_CONSECUTIVE_FRAMES
 from core.schema import Exercise, RehabPlan
 from tests.poses import PUSHUP_REP, SQUAT_REP, pushup_pose, squat_pose
-from tracking.analyzer import compute_angles
+from tracking.analyzer import SIDES, compute_angles
 from tracking.live_session import Debounce, LiveSession, rep_coaching_payload
 from tracking.ml import MLModels
 
@@ -148,3 +148,25 @@ def test_debounce():
     assert [debounce.update(v) for v in (True, True, False, True, True, True, True)] == [
         False, False, False, False, False, True, True,
     ]
+
+
+def hide_legs(pose):
+    """Legs out of frame: MediaPipe still returns guessed positions, with near-zero visibility."""
+    legs = {SIDES[side][j] for side in SIDES for j in ("hip", "knee", "ankle")}
+    return [p._replace(visibility=0.03) if i in legs else p for i, p in enumerate(pose)]
+
+
+def test_hidden_legs_are_not_counted_or_scored(models):
+    driver = Driver(LiveSession(make_plan(("squat", 1, 3)), models))
+    for angle in SQUAT_REP:
+        result = driver.frame(hide_legs(squat_pose(angle)))
+    update = result.update
+    assert update.tracking_issue == "body_not_visible"
+    assert update.rep_count == 0 and update.form_score is None and update.ml_phase is None
+    assert update.landmarks is not None  # still drawn, so the user sees what the camera sees
+    # Once the legs are visible again, the same movement counts
+    assert driver.squat_reps(1).update.rep_count == 1
+
+
+def test_no_person_reports_tracking_issue(models):
+    assert Driver(LiveSession(make_plan(("squat", 1, 1)), models)).frame(None).update.tracking_issue == "no_person"
