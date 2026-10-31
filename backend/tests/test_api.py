@@ -189,3 +189,21 @@ def test_analysis_produces_suggested_plan_for_next_session(client, monkeypatch):
     new_id = client.post("/api/session/from-suggested", json={"user_id": "user-1"}).json()["session_id"]
     assert client.get(f"/api/plan/{new_id}").json()["warmup"] == "adjusted"
     assert client.get(f"/api/session/{new_id}").json()["profile"]["injury"] == "knee"
+
+
+def test_profile_difficulty_reaches_the_llm_prompt(client, monkeypatch):
+    import llm.planner
+    from llm.client import LLMError
+
+    prompts = []
+
+    async def capture(prompt, *_args, **_kwargs):
+        prompts.append(prompt)
+        raise LLMError("captured")  # falls back, which is fine for this test
+
+    monkeypatch.setattr(llm.planner, "call_groq", capture)
+    session_id = client.post("/api/session", json={}).json()["session_id"]
+    client.post("/api/profile", json={"session_id": session_id, **PROFILE, "difficulty": "aggressive"})
+    client.post("/api/plan/generate", json={"session_id": session_id})
+    assert "Difficulty: Aggressive" in prompts[0]
+    assert client.get(f"/api/session/{session_id}").json()["profile"]["difficulty"] == "aggressive"
