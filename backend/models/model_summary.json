@@ -12,7 +12,7 @@
       "bottom": 0.9962,
       "ascending": 0.7476
     },
-    "inference_ms_median": 7.08
+    "inference_ms_median": 17.37
   },
   "form_quality_rep_level": {
     "f1": 0.7226,
@@ -40,7 +40,7 @@
       "good_morning": 1.0,
       "standard": 0.0933
     },
-    "inference_ms_median": 6.7
+    "inference_ms_median": 16.47
   },
   "anomaly_detector": {
     "contamination": 0.05,
@@ -62,7 +62,7 @@
       "shallow": 0.169,
       "good_morning": 0.4489
     },
-    "inference_ms_median": 7.53
+    "inference_ms_median": 18.1
   },
   "dataset": "Zenodo squat posture (DOI: 10.5281/zenodo.18859797)",
   "subjects": 17,

@@ -27,7 +27,7 @@ Confusion matrix (rows = true, cols = predicted): ['standing', 'descending', 'bo
  [   0   22 4248    0]
  [   2 1189    5 3418]]
 
-Single-frame inference: 7.08 ms (median)
+Single-frame inference: 17.37 ms (median)
 
 ======================================================================
 FORM QUALITY (squat, rep level)  226 reps (33 bad), 17 subjects, 4 with bad-form data
@@ -52,7 +52,7 @@ weighted avg     0.9015    0.8850    0.8910       226
 
 Out-of-fold reps flagged bad: shallow 0.6522, good morning 1.0000, standard (false alarms) 0.0933
 
-Single-rep inference: 6.70 ms (median)
+Single-rep inference: 16.47 ms (median)
 
 ======================================================================
 ANOMALY DETECTOR (Isolation Forest)  15470 standard-squat frames, 17 subjects, contamination=0.05
@@ -60,6 +60,22 @@ ANOMALY DETECTOR (Isolation Forest)  15470 standard-squat frames, 17 subjects, c
   Held-out standard frames flagged (GroupKFold 5 by subject): 0.1038 ± 0.1061
   Frames flagged by final model: shallow 0.1690, good morning 0.4489 (error types never seen in training)
 
-Single-frame inference: 7.53 ms (median)
+Single-frame inference: 18.10 ms (median)
 
-Saved models and model_summary.json to C:\Users\dhira\rehabflow-v2\backend\models
+======================================================================
+MODEL COMPARISON: PHASE DETECTOR  macro F1, GroupKFold(5) by subject, 18302 frames
+======================================================================
+  logistic_regression  F1 0.7662 ± 0.0637   inference   2.933 ms   fit   12.3 s
+  svm                  F1 0.7493 ± 0.1162   inference   4.204 ms   fit   22.4 s
+  random_forest        F1 0.8537 ± 0.0563   inference  18.345 ms   fit    9.2 s
+  xgboost              F1 0.8451 ± 0.0511   inference   9.534 ms   fit   15.5 s
+
+======================================================================
+MODEL COMPARISON: FORM QUALITY  F1 (bad = positive), StratifiedGroupKFold(4) by subject, 226 reps
+======================================================================
+  logistic_regression  F1 0.6271 ± 0.2534   inference   2.563 ms   fit    0.1 s
+  svm                  F1 0.5975 ± 0.3436   inference   2.306 ms   fit    0.0 s
+  random_forest        F1 0.7226 ± 0.2210   inference  16.957 ms   fit    1.6 s
+  xgboost              F1 0.7300 ± 0.2174   inference   2.724 ms   fit    0.2 s
+
+Saved models, model_summary.json, and model_comparison.json to C:\Users\dhira\rehabflow-v2\backend\models

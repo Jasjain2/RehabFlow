@@ -4,6 +4,10 @@ Prints subject-grouped cross-validation results, then trains each model on all d
 and saves it to models/ with its feature names and scores. All scores are also
 written to models/model_summary.json.
 
+Then benchmarks Logistic Regression, SVM, Random Forest, and XGBoost on the phase and
+form quality tasks, on the same cross-validation splits, and writes
+models/model_comparison.json. Random Forest stays the deployed model either way.
+
 Run scripts/process_data.py first.
 Usage: python scripts/train_models.py
 """
@@ -16,8 +20,14 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
 from sklearn.model_selection import GroupKFold, StratifiedGroupKFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.svm import SVC
+from sklearn.utils.class_weight import compute_sample_weight
+from xgboost import XGBClassifier
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
@@ -39,9 +49,24 @@ def make_forest(**kwargs) -> RandomForestClassifier:
     return RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1, **kwargs)
 
 
+def phase_splits(data: pd.DataFrame) -> list:
+    return list(GroupKFold(n_splits=5).split(data, groups=data["subject_id"]))
+
+
+def form_splits(data: pd.DataFrame, y: pd.Series) -> list:
+    # Each fold holds out one of the 4 subjects with bad-form data
+    return list(StratifiedGroupKFold(n_splits=4, shuffle=True, random_state=RANDOM_STATE)
+                .split(data, y, data["subject_id"]))
+
+
+def single_threaded(model) -> None:
+    """Set every n_jobs parameter (including inside pipelines) to 1, as in the live session."""
+    model.set_params(**{k: 1 for k in model.get_params() if k == "n_jobs" or k.endswith("__n_jobs")})
+
+
 def inference_latency_ms(model, X: pd.DataFrame, predict=lambda m, row: m.predict(row), n: int = 200) -> float:
     """Median time to score one sample, as the live session does. Leaves the model single-threaded."""
-    model.set_params(n_jobs=1)
+    single_threaded(model)
     times = []
     for i in range(min(n, len(X))):
         row = X.iloc[[i]]
@@ -66,7 +91,7 @@ def train_phase_detector() -> dict:
     banner(f"PHASE DETECTOR  {len(data)} frames, {groups.nunique()} subjects, GroupKFold(5) by subject")
 
     fold_scores, oof = [], pd.Series(index=data.index, dtype=object)
-    for fold, (train_idx, test_idx) in enumerate(GroupKFold(n_splits=5).split(X, y, groups), 1):
+    for fold, (train_idx, test_idx) in enumerate(phase_splits(data), 1):
         model = make_forest().fit(X.iloc[train_idx], y.iloc[train_idx])
         pred = model.predict(X.iloc[test_idx])
         oof.iloc[test_idx] = pred
@@ -109,10 +134,9 @@ def train_form_quality() -> dict:
         "StratifiedGroupKFold(4) by subject: each fold holds out one bad-form subject"
     )
 
-    cv = StratifiedGroupKFold(n_splits=4, shuffle=True, random_state=RANDOM_STATE)
     fold_scores = []
     oof = pd.Series(0, index=data.index)
-    for fold, (train_idx, test_idx) in enumerate(cv.split(X, y, groups), 1):
+    for fold, (train_idx, test_idx) in enumerate(form_splits(data, y), 1):
         if y.iloc[test_idx].sum() == 0:
             sys.exit(f"Fold {fold} has no bad-form reps; F1 would be undefined")
         model = make_forest(class_weight="balanced").fit(X.iloc[train_idx], y.iloc[train_idx])
@@ -198,6 +222,82 @@ def train_anomaly_detector() -> dict:
     return metrics
 
 
+# --- Model comparison ---
+
+def candidate_models(balanced: bool) -> dict:
+    """Library defaults for each family (tree ensembles at 100 trees), so the comparison
+    reflects the model family rather than tuning effort. Scale-sensitive models get
+    standardized features. `balanced` reweights classes for the imbalanced form task."""
+    weight = "balanced" if balanced else None
+    return {
+        "logistic_regression": lambda: make_pipeline(
+            StandardScaler(), LogisticRegression(max_iter=5000, class_weight=weight)),
+        "svm": lambda: make_pipeline(StandardScaler(), SVC(kernel="rbf", class_weight=weight)),
+        "random_forest": lambda: make_forest(class_weight=weight),
+        "xgboost": lambda: XGBClassifier(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1),
+    }
+
+
+def benchmark(X: pd.DataFrame, y: pd.Series, splits: list, average: str, balanced: bool) -> dict:
+    labels = LabelEncoder().fit_transform(y)  # XGBoost needs 0..k-1 labels; F1 is unaffected
+    results = {}
+    for name, make in candidate_models(balanced).items():
+        scores, fit_seconds = [], 0.0
+        for train_idx, test_idx in splits:
+            model = make()
+            fit_kwargs = {}
+            if name == "xgboost" and balanced:
+                # XGBoost has no class_weight; per-sample weights give the same balancing
+                fit_kwargs["sample_weight"] = compute_sample_weight("balanced", labels[train_idx])
+            start = time.perf_counter()
+            model.fit(X.iloc[train_idx], labels[train_idx], **fit_kwargs)
+            fit_seconds += time.perf_counter() - start
+            scores.append(f1_score(labels[test_idx], model.predict(X.iloc[test_idx]), average=average))
+        latency = inference_latency_ms(model, X.iloc[splits[-1][1]])
+        results[name] = {
+            "f1": round(float(np.mean(scores)), 4),
+            "std": round(float(np.std(scores)), 4),
+            "fold_f1": [round(float(f), 4) for f in scores],
+            "inference_ms_median": round(latency, 3),
+            "fit_seconds_total": round(fit_seconds, 2),
+        }
+        print(f"  {name:<20} F1 {results[name]['f1']:.4f} ± {results[name]['std']:.4f}   "
+              f"inference {latency:7.3f} ms   fit {fit_seconds:6.1f} s")
+    return results
+
+
+def compare_models() -> dict:
+    phase = pd.read_csv(DATA_DIR / "phase_training.csv")
+    banner(f"MODEL COMPARISON: PHASE DETECTOR  macro F1, GroupKFold(5) by subject, {len(phase)} frames")
+    phase_results = benchmark(phase[FEATURE_NAMES], phase["phase_label"], phase_splits(phase), "macro", False)
+
+    form = pd.read_csv(DATA_DIR / "form_quality_rep_training.csv")
+    y = (form["form_label"] == "bad").astype(int)
+    banner(f"MODEL COMPARISON: FORM QUALITY  F1 (bad = positive), StratifiedGroupKFold(4) by subject, "
+           f"{len(form)} reps")
+    form_results = benchmark(form[REP_FEATURE_NAMES], y, form_splits(form, y), "binary", True)
+
+    return {
+        "deployed": "random_forest",
+        "hyperparameters": "library defaults; Random Forest and XGBoost at 100 trees; "
+                           "Logistic Regression and SVM (RBF) on standardized features",
+        "inference": "median single-sample predict latency, single-threaded",
+        "phase_detector": {
+            "metric": "macro F1",
+            "validation": "GroupKFold 5-fold by subject",
+            "n_samples": len(phase),
+            "models": phase_results,
+        },
+        "form_quality_rep_level": {
+            "metric": "binary F1, bad = positive",
+            "validation": "StratifiedGroupKFold 4-fold by subject (one bad-form subject held out per fold)",
+            "class_balancing": "class_weight='balanced' (sample weights for XGBoost)",
+            "n_samples": len(form),
+            "models": form_results,
+        },
+    }
+
+
 def main() -> None:
     squat = pd.read_csv(DATA_DIR / "squat.csv", usecols=["subject_id", "squat_type"])
     summary = {
@@ -209,7 +309,13 @@ def main() -> None:
         "squat_types": sorted(squat["squat_type"].unique()),
     }
     (MODELS_DIR / "model_summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-    print(f"\nSaved models and model_summary.json to {MODELS_DIR}")
+
+    comparison = compare_models()
+    # The comparison's Random Forest must reproduce the deployed model's CV score
+    for task in ("phase_detector", "form_quality_rep_level"):
+        assert comparison[task]["models"]["random_forest"]["f1"] == summary[task]["f1"], task
+    (MODELS_DIR / "model_comparison.json").write_text(json.dumps(comparison, indent=2) + "\n", encoding="utf-8")
+    print(f"\nSaved models, model_summary.json, and model_comparison.json to {MODELS_DIR}")
 
 
 if __name__ == "__main__":

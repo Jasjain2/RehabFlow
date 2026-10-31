@@ -1,0 +1,120 @@
+{
+  "deployed": "random_forest",
+  "hyperparameters": "library defaults; Random Forest and XGBoost at 100 trees; Logistic Regression and SVM (RBF) on standardized features",
+  "inference": "median single-sample predict latency, single-threaded",
+  "phase_detector": {
+    "metric": "macro F1",
+    "validation": "GroupKFold 5-fold by subject",
+    "n_samples": 18302,
+    "models": {
+      "logistic_regression": {
+        "f1": 0.7662,
+        "std": 0.0637,
+        "fold_f1": [
+          0.6816,
+          0.7872,
+          0.7287,
+          0.7611,
+          0.8724
+        ],
+        "inference_ms_median": 2.933,
+        "fit_seconds_total": 12.32
+      },
+      "svm": {
+        "f1": 0.7493,
+        "std": 0.1162,
+        "fold_f1": [
+          0.533,
+          0.8513,
+          0.7728,
+          0.7416,
+          0.8478
+        ],
+        "inference_ms_median": 4.204,
+        "fit_seconds_total": 22.35
+      },
+      "random_forest": {
+        "f1": 0.8537,
+        "std": 0.0563,
+        "fold_f1": [
+          0.801,
+          0.9316,
+          0.8272,
+          0.7982,
+          0.9103
+        ],
+        "inference_ms_median": 18.345,
+        "fit_seconds_total": 9.15
+      },
+      "xgboost": {
+        "f1": 0.8451,
+        "std": 0.0511,
+        "fold_f1": [
+          0.7937,
+          0.9082,
+          0.8243,
+          0.795,
+          0.9042
+        ],
+        "inference_ms_median": 9.534,
+        "fit_seconds_total": 15.48
+      }
+    }
+  },
+  "form_quality_rep_level": {
+    "metric": "binary F1, bad = positive",
+    "validation": "StratifiedGroupKFold 4-fold by subject (one bad-form subject held out per fold)",
+    "class_balancing": "class_weight='balanced' (sample weights for XGBoost)",
+    "n_samples": 226,
+    "models": {
+      "logistic_regression": {
+        "f1": 0.6271,
+        "std": 0.2534,
+        "fold_f1": [
+          0.6316,
+          1.0,
+          0.2857,
+          0.5909
+        ],
+        "inference_ms_median": 2.563,
+        "fit_seconds_total": 0.07
+      },
+      "svm": {
+        "f1": 0.5975,
+        "std": 0.3436,
+        "fold_f1": [
+          1.0,
+          0.8571,
+          0.375,
+          0.1579
+        ],
+        "inference_ms_median": 2.306,
+        "fit_seconds_total": 0.04
+      },
+      "random_forest": {
+        "f1": 0.7226,
+        "std": 0.221,
+        "fold_f1": [
+          1.0,
+          0.8571,
+          0.4286,
+          0.6047
+        ],
+        "inference_ms_median": 16.957,
+        "fit_seconds_total": 1.62
+      },
+      "xgboost": {
+        "f1": 0.73,
+        "std": 0.2174,
+        "fold_f1": [
+          1.0,
+          0.8571,
+          0.4286,
+          0.6341
+        ],
+        "inference_ms_median": 2.724,
+        "fit_seconds_total": 0.23
+      }
+    }
+  }
+}

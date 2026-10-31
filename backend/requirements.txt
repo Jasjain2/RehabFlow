@@ -12,6 +12,8 @@ numpy==2.4.6
 pandas==3.1.0
 scikit-learn==1.9.1
 joblib==1.6.0
+# Model comparison only; the deployed models are scikit-learn
+xgboost-cpu==3.2.0
 
 # Phase 5: API, pose estimation
 fastapi==0.162.0
