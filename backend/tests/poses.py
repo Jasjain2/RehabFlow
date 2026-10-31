@@ -7,11 +7,12 @@ SEGMENT = 0.2  # thigh and shin length, normalized image units
 TORSO = 0.3
 
 # Knee angles for one squat rep, sampled every 400ms: standing, descending, bottom,
-# ascending, standing. Each phase lasts at least the 3 frames the rep counter needs.
-SQUAT_REP = [175, 175, 175, 150, 130, 110, 90, 85, 85, 90, 110, 130, 150, 170, 175, 175]
+# ascending, standing. Each phase lasts at least the 2 frames the rep counter needs,
+# and the rep completes on the last frame.
+SQUAT_REP = [175, 175, 175, 150, 130, 110, 90, 85, 85, 90, 110, 130, 150, 170, 175]
 
-# Elbow angles for one push-up rep
-PUSHUP_REP = [170, 170, 170, 130, 95, 90, 90, 120, 160, 170, 170]
+# Elbow angles for one push-up rep, completing on the last frame
+PUSHUP_REP = [170, 170, 170, 130, 95, 90, 90, 120, 160, 170]
 
 
 def squat_pose(

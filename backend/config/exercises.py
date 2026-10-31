@@ -19,7 +19,7 @@ EXERCISES = {
         "rep_depth_phase": "bottom",
         # Phases between the thresholds, picked by the direction the primary angle is moving
         "moving_phases": {"decreasing": "descending", "increasing": "ascending"},
-        "consecutive_frames_for_transition": 3,
+        "consecutive_frames_for_transition": 2,
         # knee_valgus is computed as a feature but has no ideal range yet: it needs a
         # frontal camera view, while depth scoring needs a side view.
         "joints_tracked": ["knee_flexion", "hip_flexion", "trunk_lean", "knee_valgus"],
@@ -60,7 +60,7 @@ EXERCISES = {
         "rep_start_phase": "up",
         "rep_depth_phase": "down",
         "moving_phases": {},
-        "consecutive_frames_for_transition": 3,
+        "consecutive_frames_for_transition": 2,
         "joints_tracked": ["elbow_flexion", "shoulder_flexion", "body_straightness"],
         "ideal_ranges": {
             "up": {

@@ -6,10 +6,11 @@ changes after the same new phase is observed on N consecutive frames, so
 single-frame jitter around a threshold can't advance the state.
 
 A rep is counted when the movement returns to the start phase (standing / up)
-after having reached the depth phase (bottom / down). Returning to the start
-phase without reaching depth is a partial rep and is not counted. Intermediate
-phases may be skipped, because at 400ms per frame a fast descent can go
-straight from standing to bottom.
+after reaching depth (bottom / down). Depth is registered from a single frame,
+since the bottom of a rep is brief; leaving and returning to the start phase
+still need N frames. Returning without reaching depth is a partial rep and is
+not counted. Intermediate phases may be skipped, because at 400ms per frame a
+fast descent can go straight from standing to bottom.
 """
 import math
 
@@ -68,8 +69,17 @@ class RepCounter:
         if observed not in self.config["phases"]:
             raise ValueError(f"Unknown phase {observed!r}. Available: {self.config['phases']}")
 
+        # Depth needs a single frame: at 400ms per frame, a normal-speed squat spends under a
+        # second at the bottom, so waiting for N frames there missed real reps. It only counts
+        # once the movement is under way, so a stray frame while standing can't arm a rep.
+        if observed == self.depth_phase and (self.phase != self.start_phase or self._candidate is not None):
+            self._reached_depth = True
+
         if observed == self.phase:
             self._candidate, self._streak = None, 0
+            if self.phase == self.start_phase:
+                # Still standing after a blip that never became a transition
+                self._reached_depth = False
             return False
         if observed == self._candidate:
             self._streak += 1
