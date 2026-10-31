@@ -3,11 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CameraFeed from '@/components/CameraFeed';
+import EmergencyStop from '@/components/EmergencyStop';
 import FatigueAlert from '@/components/FatigueAlert';
 import FormScore from '@/components/FormScore';
 import LiveSignals from '@/components/LiveSignals';
 import NoSession from '@/components/NoSession';
-import RestOverlay from '@/components/RestOverlay';
+import RestTimer from '@/components/RestTimer';
+import TrackingHint from '@/components/TrackingHint';
 import { connectExerciseStream, finishSession, getPlan } from '@/lib/api';
 import { EXERCISE_LABELS, errorMessage } from '@/lib/format';
 import { getCurrentSessionId } from '@/lib/storage';
@@ -89,7 +91,7 @@ export default function ExercisePage() {
   const resting = update?.status === 'resting';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-28">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">
@@ -127,7 +129,12 @@ export default function ExercisePage() {
             onFrame={sendFrame}
             landmarks={update?.landmarks}
           />
-          {resting && <RestOverlay update={update} onSkip={skipRest} />}
+          {update?.tracking_issue && !resting && (
+            <TrackingHint issue={update.tracking_issue} exercise={update.exercise} />
+          )}
+          {resting && currentExercise && (
+            <RestTimer update={update} restSeconds={currentExercise.rest_seconds} onSkip={skipRest} />
+          )}
         </div>
 
         <div className="space-y-4">
@@ -155,6 +162,7 @@ export default function ExercisePage() {
           )}
         </div>
       </div>
+      <EmergencyStop onStop={finish} stopping={finishing} />
     </div>
   );
 }

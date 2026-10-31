@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { InjuryType, MobilityLevel, UserProfile } from '@/lib/types';
+import DifficultySelector from '@/components/DifficultySelector';
+import type { Difficulty, InjuryType, MobilityLevel, UserProfile } from '@/lib/types';
 
 const INJURY_OPTIONS: { value: InjuryType; label: string }[] = [
   { value: 'knee', label: 'Knee' },
@@ -33,6 +34,7 @@ export default function InjuryForm({ onSubmit, submitting }: Props) {
   const [injury, setInjury] = useState<InjuryType | ''>('');
   const [mobility, setMobility] = useState<MobilityLevel | ''>('');
   const [painTolerance, setPainTolerance] = useState(5);
+  const [difficulty, setDifficulty] = useState<Difficulty>('conservative');
 
   const ageNumber = Number(age);
   const ageValid = Number.isInteger(ageNumber) && ageNumber >= MIN_AGE && ageNumber <= MAX_AGE;
@@ -41,7 +43,7 @@ export default function InjuryForm({ onSubmit, submitting }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-    onSubmit({ age: ageNumber, injury, mobility, pain_tolerance: painTolerance });
+    onSubmit({ age: ageNumber, injury, mobility, pain_tolerance: painTolerance, difficulty });
   }
 
   return (
@@ -116,6 +118,8 @@ export default function InjuryForm({ onSubmit, submitting }: Props) {
           <span>High</span>
         </span>
       </label>
+
+      <DifficultySelector value={difficulty} onChange={setDifficulty} />
 
       <button
         type="submit"

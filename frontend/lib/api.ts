@@ -31,8 +31,8 @@ export function createSession(userId: string): Promise<{ session_id: string }> {
   return post('/api/session', { user_id: userId });
 }
 
-export function saveProfile(sessionId: string, profile: UserProfile): Promise<void> {
-  return post('/api/profile', { session_id: sessionId, ...profile });
+export function saveProfile(sessionId: string, profile: UserProfile, disclaimerAcknowledged: boolean): Promise<void> {
+  return post('/api/profile', { session_id: sessionId, ...profile, disclaimer_acknowledged: disclaimerAcknowledged });
 }
 
 export function generatePlan(sessionId: string): Promise<RehabPlan> {

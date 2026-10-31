@@ -2,10 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import DisclaimerModal from '@/components/DisclaimerModal';
 import InjuryForm from '@/components/InjuryForm';
 import { createSession, createSessionFromSuggested, generatePlan, getSuggestedPlan, saveProfile } from '@/lib/api';
 import { EXERCISE_LABELS, errorMessage } from '@/lib/format';
-import { getUserId, setCurrentSessionId } from '@/lib/storage';
+import { acknowledgeDisclaimer, getUserId, isDisclaimerAcknowledged, setCurrentSessionId } from '@/lib/storage';
 import type { SuggestedPlan, UserProfile } from '@/lib/types';
 
 export default function OnboardingPage() {
@@ -13,6 +14,12 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggested, setSuggested] = useState<SuggestedPlan | null>(null);
+  // null until read from storage, so the modal doesn't flash for users who already acknowledged
+  const [acknowledged, setAcknowledged] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setAcknowledged(isDisclaimerAcknowledged());
+  }, []);
 
   useEffect(() => {
     // A missing backend shouldn't block the form, so ignore failures here
@@ -38,7 +45,7 @@ export default function OnboardingPage() {
     try {
       const { session_id } = await createSession(getUserId());
       setCurrentSessionId(session_id);
-      await saveProfile(session_id, profile);
+      await saveProfile(session_id, profile, true);
       await generatePlan(session_id);
       router.push('/plan');
     } catch (err) {
@@ -49,6 +56,14 @@ export default function OnboardingPage() {
 
   return (
     <div className="mx-auto max-w-lg">
+      {acknowledged === false && (
+        <DisclaimerModal
+          onAcknowledge={() => {
+            acknowledgeDisclaimer();
+            setAcknowledged(true);
+          }}
+        />
+      )}
       <h1 className="text-2xl font-semibold">Tell us about your recovery</h1>
       <p className="mt-2 text-slate-600">
         We&apos;ll build a personalized exercise plan, then track your form through your webcam as you

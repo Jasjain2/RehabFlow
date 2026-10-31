@@ -3,6 +3,7 @@
 
 const USER_ID_KEY = 'rehabflow.userId';
 const SESSION_ID_KEY = 'rehabflow.sessionId';
+const DISCLAIMER_KEY = 'rehabflow.disclaimerAcknowledged';
 
 function safeGet(storage: Storage, key: string): string | null {
   try {
@@ -35,4 +36,13 @@ export function getCurrentSessionId(): string | null {
 
 export function setCurrentSessionId(id: string): void {
   safeSet(sessionStorage, SESSION_ID_KEY, id);
+}
+
+/** Acknowledged once per browser session, so the disclaimer shows again on each new visit */
+export function isDisclaimerAcknowledged(): boolean {
+  return safeGet(sessionStorage, DISCLAIMER_KEY) === 'true';
+}
+
+export function acknowledgeDisclaimer(): void {
+  safeSet(sessionStorage, DISCLAIMER_KEY, 'true');
 }
