@@ -41,20 +41,50 @@ class RehabPlan(BaseModel):
     overall_safety: str
 
 
+SessionStatus = Literal["exercising", "resting", "complete"]
+
+
+class FrameMessage(BaseModel):
+    """Sent by the client over the WebSocket every frame interval."""
+
+    type: Literal["frame"] = "frame"
+    image: str  # base64 JPEG, with or without a data: URL prefix
+
+
 class ExerciseUpdate(BaseModel):
     """Pushed over the WebSocket after each processed frame."""
 
-    form_score: float = Field(ge=0, le=100)
-    rep_count: int = Field(ge=0)
+    status: SessionStatus
+    exercise: ExerciseName
+    exercise_index: int = Field(ge=0)  # position in plan.exercises
     set_number: int = Field(ge=1)
+    total_sets: int = Field(ge=1)
+    rep_in_set: int = Field(ge=0)
+    reps_per_set: int = Field(ge=1)
+    rep_count: int = Field(ge=0)  # total reps completed this session
+    phase: str
+    # None when no person was detected in the frame
+    form_score: float | None = Field(default=None, ge=0, le=100)
+    joint_scores: dict[str, float] = {}
     fatigue_level: FatigueLevel
     fatigue_drift: float
-    phase: str
-    joint_scores: dict[str, float]
     ml_form_quality: FormQuality | None = None
+    rest_seconds_remaining: int | None = None
+    # 33 [x, y, visibility] triples in normalized image coordinates, for the skeleton overlay
+    landmarks: list[tuple[float, float, float]] | None = None
+
+
+class RepSummary(BaseModel):
+    exercise: ExerciseName
+    set_number: int = Field(ge=1)
+    rep_number: int = Field(ge=1)
+    form_score: float = Field(ge=0, le=100)
+    fatigue_drift: float
+    fatigue_level: FatigueLevel
 
 
 class SessionReport(BaseModel):
+    session_id: str
     total_reps: int = Field(ge=0)
     total_exercises: int = Field(ge=0)
     avg_form_score: float = Field(ge=0, le=100)
@@ -62,5 +92,13 @@ class SessionReport(BaseModel):
     fatigue_alerts_count: int = Field(ge=0)
     xp_earned: int = Field(ge=0)
     badges: list[str]
-    rep_scores: list[float]
+    reps: list[RepSummary]
     duration_seconds: int = Field(ge=0)
+
+
+class HistoryEntry(BaseModel):
+    session_id: str
+    created_at: str  # ISO 8601
+    exercises: list[ExerciseName]
+    total_reps: int = Field(ge=0)
+    avg_form_score: float = Field(ge=0, le=100)
