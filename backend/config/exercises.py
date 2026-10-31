@@ -17,6 +17,10 @@ EXERCISES = {
         # A rep starts and ends in rep_start_phase and must pass through rep_depth_phase
         "rep_start_phase": "standing",
         "rep_depth_phase": "bottom",
+        # How deep a rep must go to count, by plan difficulty. Overrides the bottom
+        # threshold above: partial-depth squats are the intended movement for many
+        # knee rehab patients, so conservative plans count shallower reps.
+        "depth_threshold_by_difficulty": {"conservative": 120, "moderate": 110, "aggressive": 100},
         # Phases between the thresholds, picked by the direction the primary angle is moving
         "moving_phases": {"decreasing": "descending", "increasing": "ascending"},
         "consecutive_frames_for_transition": 2,

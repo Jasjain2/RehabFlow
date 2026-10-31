@@ -167,6 +167,7 @@ async def exercise_stream(ws: WebSocket, session_id: str) -> None:
             await ws.close(code=4404, reason="Session not found")
             return
         plan = state.plan_of(record)
+        profile = state.profile_of(record)
         if plan is None:
             await ws.close(code=4400, reason="This session has no plan yet")
             return
@@ -175,12 +176,12 @@ async def exercise_stream(ws: WebSocket, session_id: str) -> None:
             return
         state.mark_started(db, record)
 
-    live = LiveSession(plan, get_ml_models())
+    live = LiveSession(plan, get_ml_models(), profile.difficulty if profile else "conservative")
     pose = get_pose_estimator()
     coaching_tasks: set[asyncio.Task] = set()
     frames = frames_with_pose = 0
     processing_s = 0.0
-    log.info("Session %s stream connected", session_id)
+    log.info("Session %s stream connected (%s difficulty)", session_id, live.difficulty)
     try:
         while True:
             try:

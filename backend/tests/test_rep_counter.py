@@ -66,15 +66,32 @@ def test_stray_depth_frame_while_standing_does_not_arm_a_rep():
     assert feed(counter, ["descending", "standing"]) == 0
 
 
-def test_real_webcam_session_counts_every_rep_that_reached_depth():
-    """Knee angles from a real webcam session (None = joints not visible). It had 9
-    squats: 6 reached <=100 degrees, some for a single frame; 3 stayed above 110."""
+@pytest.mark.parametrize("difficulty, expected", [("aggressive", 6), ("moderate", 6), ("conservative", 8)])
+def test_real_webcam_session_counts_every_rep_that_reached_depth(difficulty, expected):
+    """Knee angles from a real webcam session (None = joints not visible). Its 9 squats
+    bottomed at 131, 112, 114, 97, 82, 68, 64, 68 and 63 degrees, some for a single
+    frame. Depth lines: aggressive 100, moderate 110, conservative 120."""
     angles = json.loads((Path(__file__).parent / "data" / "webcam_session_knee_angles.json").read_text())
-    counter = RepCounter("squat")
+    counter = RepCounter("squat", difficulty)
     for angle in angles:
         if angle is not None:
             counter.update(float(angle))
-    assert counter.rep_count == 6
+    assert counter.rep_count == expected
+
+
+def test_depth_threshold_follows_difficulty_for_squats_only():
+    assert [RepCounter("squat", d).depth_max for d in ("conservative", "moderate", "aggressive")] == [120, 110, 100]
+    assert RepCounter("squat").depth_max == 100  # no difficulty: the phase threshold
+    assert RepCounter("push_up", "conservative").depth_max == 100
+
+
+def test_conservative_counts_a_partial_squat_that_aggressive_does_not():
+    partial = [175, 175, 150, 130, 115, 115, 130, 150, 170, 175]
+    for difficulty, expected in (("conservative", 1), ("aggressive", 0)):
+        counter = RepCounter("squat", difficulty)
+        for angle in partial:
+            counter.update(angle)
+        assert counter.rep_count == expected, difficulty
 
 
 def test_partial_cycle_does_not_count():

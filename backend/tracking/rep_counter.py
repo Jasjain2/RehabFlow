@@ -16,9 +16,20 @@ import math
 
 from config.exercises import get_exercise
 from config.settings import ANGLE_DIRECTION_DEADBAND_DEG
+from core.schema import Difficulty
 
 
-def classify_phase(config: dict, angle: float, previous_angle: float | None) -> str | None:
+def depth_threshold(config: dict, difficulty: Difficulty | None = None) -> float:
+    """Primary angle a rep must reach to count: per difficulty if the exercise defines it."""
+    by_difficulty = config.get("depth_threshold_by_difficulty")
+    if difficulty and by_difficulty:
+        return by_difficulty[difficulty]
+    return config["phase_thresholds"][config["rep_depth_phase"]][f"{config['primary_angle']}_max"]
+
+
+def classify_phase(
+    config: dict, angle: float, previous_angle: float | None, depth_max: float | None = None
+) -> str | None:
     """Phase implied by the primary angle, or None if this frame gives no clear evidence."""
     if math.isnan(angle):
         return None
@@ -26,7 +37,7 @@ def classify_phase(config: dict, angle: float, previous_angle: float | None) -> 
     start, depth = config["rep_start_phase"], config["rep_depth_phase"]
     if angle >= config["phase_thresholds"][start][f"{primary}_min"]:
         return start
-    if angle <= config["phase_thresholds"][depth][f"{primary}_max"]:
+    if angle <= (depth_max if depth_max is not None else depth_threshold(config)):
         return depth
 
     moving = config["moving_phases"]
@@ -39,8 +50,9 @@ def classify_phase(config: dict, angle: float, previous_angle: float | None) -> 
 
 
 class RepCounter:
-    def __init__(self, exercise: str):
+    def __init__(self, exercise: str, difficulty: Difficulty | None = None):
         self.config = get_exercise(exercise)
+        self.depth_max = depth_threshold(self.config, difficulty)
         self.required_frames = self.config["consecutive_frames_for_transition"]
         self.start_phase = self.config["rep_start_phase"]
         self.depth_phase = self.config["rep_depth_phase"]
@@ -56,7 +68,7 @@ class RepCounter:
 
     def update(self, angle: float) -> bool:
         """Feed the primary joint angle for one frame. Returns True if a rep was just completed."""
-        observed = classify_phase(self.config, angle, self._previous_angle)
+        observed = classify_phase(self.config, angle, self._previous_angle, self.depth_max)
         self.last_observation = observed
         if not math.isnan(angle):
             self._previous_angle = angle

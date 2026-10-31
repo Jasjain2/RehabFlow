@@ -141,6 +141,18 @@ def test_full_session_flow(client, monkeypatch):
     assert client.get("/api/plan/suggested/user-1").status_code == 404
 
 
+def test_stream_uses_profile_difficulty_for_depth(client, monkeypatch):
+    session_id = new_session(client)  # PROFILE has no difficulty: conservative
+    partial = [175, 175, 150, 130, 115, 115, 130, 150, 170, 175]
+    monkeypatch.setattr(main, "get_pose_estimator", lambda: FakePose(squat_pose(a) for a in partial))
+    frame = json.dumps({"type": "frame", "image": jpeg_b64()})
+    with client.websocket_connect(f"/api/exercise/stream?session_id={session_id}") as ws:
+        for _ in partial:
+            ws.send_text(frame)
+            update = ws.receive_json()
+    assert update["rep_count"] == 1
+
+
 def test_finished_session_stream_is_rejected(client):
     session_id = new_session(client)
     client.post("/api/exercise/finish", json={"session_id": session_id})

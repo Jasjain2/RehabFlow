@@ -14,7 +14,7 @@ from config import settings
 from config.exercises import get_exercise
 from core.exercise_queue import ExerciseQueue
 from core.report import posture_check
-from core.schema import ExerciseUpdate, FatigueLevel, FormQuality, PostureCheck, RehabPlan
+from core.schema import Difficulty, ExerciseUpdate, FatigueLevel, FormQuality, PostureCheck, RehabPlan
 from tracking.analyzer import (
     SIDES,
     Landmark,
@@ -96,8 +96,9 @@ class _RepFrames:
 
 
 class LiveSession:
-    def __init__(self, plan: RehabPlan, models: MLModels | None):
+    def __init__(self, plan: RehabPlan, models: MLModels | None, difficulty: Difficulty = "conservative"):
         self.queue = ExerciseQueue(plan)
+        self.difficulty = difficulty
         self.models = models
         self.anomalous_frames = 0
         self.phase_disagreements = 0
@@ -219,7 +220,7 @@ class LiveSession:
             return
         self._active_set = key
         # Fresh counter per set: the user may have moved around while resting
-        self._counter = RepCounter(self.queue.current.name)
+        self._counter = RepCounter(self.queue.current.name, self.difficulty)
         self._rep = _RepFrames()
         self._resting_after = None
 
