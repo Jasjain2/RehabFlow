@@ -155,8 +155,17 @@ def score_joint(angle: float, ideal_range: Sequence[float]) -> tuple[float, floa
     return max(0.0, 100.0 - POINTS_LOST_PER_DEGREE * abs(deviation)), deviation
 
 
-def score_frame(exercise: str, phase: str, angles: dict[str, float]) -> FrameScore | None:
-    """Score one frame against the ideal ranges for this exercise and phase.
+def ideal_ranges(config: dict, phase: str, difficulty: str | None = None) -> dict[str, list[float]]:
+    """Ideal joint ranges for a phase, with any per-difficulty overrides applied."""
+    ranges = config["ideal_ranges"][phase]
+    overrides = config.get("ideal_range_overrides_by_difficulty", {}).get(difficulty, {}).get(phase)
+    return {**ranges, **overrides} if overrides else ranges
+
+
+def score_frame(
+    exercise: str, phase: str, angles: dict[str, float], difficulty: str | None = None
+) -> FrameScore | None:
+    """Score one frame against the ideal ranges for this exercise, phase, and difficulty.
 
     Only tracked joints that have an ideal range in this phase and a valid angle are
     scored. Returns None if no joint could be scored (e.g. every landmark occluded).
@@ -164,7 +173,7 @@ def score_frame(exercise: str, phase: str, angles: dict[str, float]) -> FrameSco
     config = get_exercise(exercise)
     if phase not in config["ideal_ranges"]:
         raise ValueError(f"Unknown phase {phase!r} for {exercise}. Available: {config['phases']}")
-    ranges = config["ideal_ranges"][phase]
+    ranges = ideal_ranges(config, phase, difficulty)
 
     joint_scores, deviations = {}, {}
     for joint in config["joints_tracked"]:

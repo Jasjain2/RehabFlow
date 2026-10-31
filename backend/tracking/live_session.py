@@ -145,7 +145,7 @@ class LiveSession:
         angles = compute_angles(landmarks)
         rep_done = self._counter.update(angles[primary])
         phase = self._counter.phase
-        frame = score_frame(exercise.name, phase, angles)
+        frame = score_frame(exercise.name, phase, angles, self.difficulty)
 
         ml_phase = anomaly = None
         if config["ml_models"] and self.models:

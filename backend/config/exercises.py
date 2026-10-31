@@ -21,6 +21,13 @@ EXERCISES = {
         # threshold above: partial-depth squats are the intended movement for many
         # knee rehab patients, so conservative plans count shallower reps.
         "depth_threshold_by_difficulty": {"conservative": 120, "moderate": 110, "aggressive": 100},
+        # Ideal ranges replaced per difficulty, so a rep deep enough to count also scores
+        # as on-target: a conservative patient at 115 degrees shouldn't lose knee points.
+        "ideal_range_overrides_by_difficulty": {
+            "conservative": {"bottom": {"knee_flexion": [70, 120]}},
+            "moderate": {"bottom": {"knee_flexion": [70, 110]}},
+            "aggressive": {"bottom": {"knee_flexion": [70, 95]}},
+        },
         # Phases between the thresholds, picked by the direction the primary angle is moving
         "moving_phases": {"decreasing": "descending", "increasing": "ascending"},
         "consecutive_frames_for_transition": 2,

@@ -60,6 +60,22 @@ def test_different_phases_have_different_ideals():
     assert score_frame("squat", "standing", bottom_angles).score < 100
 
 
+@pytest.mark.parametrize("difficulty, knee_score", [
+    ("conservative", 100), ("moderate", 90), ("aggressive", 60), (None, 60),
+])
+def test_squat_bottom_range_follows_difficulty(difficulty, knee_score):
+    # 115 degrees: inside conservative's 70-120, 5 over moderate's 110, 20 over 95
+    angles = {"knee_flexion": 115, "hip_flexion": 80, "trunk_lean": 20}
+    assert score_frame("squat", "bottom", angles, difficulty).joint_scores["knee_flexion"] == knee_score
+
+
+def test_difficulty_only_overrides_the_configured_phase_and_joint():
+    angles = {"knee_flexion": 170, "hip_flexion": 170, "trunk_lean": 5}
+    assert score_frame("squat", "standing", angles, "conservative") == score_frame("squat", "standing", angles)
+    assert score_frame("squat", "bottom", {"hip_flexion": 120}, "conservative").joint_scores["hip_flexion"] == 40
+    assert score_frame("push_up", "down", {"elbow_flexion": 90}, "conservative").score == 100
+
+
 def test_missing_and_nan_angles_are_skipped():
     result = score_frame("squat", "standing", {"knee_flexion": 170, "hip_flexion": math.nan})
     assert set(result.joint_scores) == {"knee_flexion"}
