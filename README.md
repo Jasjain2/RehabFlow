@@ -2,7 +2,7 @@
 
 An AI rehab companion for people recovering from injuries and exercising at home. You describe your injury, an LLM writes an exercise plan, and your webcam tracks your form while you exercise. The app counts reps, scores each joint against ideal angles, warns you when your form drops from your own baseline, and coaches you between sets. After the session it writes a report and an AI analysis, and suggests an adjusted plan for next time.
 
-Built by Jas Jain using Claude Code.
+Built by Jas Jain.
 
 > **Not medical advice.** RehabFlow is for fitness guidance only and is not a substitute for a doctor or physical therapist.
 
